@@ -19,8 +19,22 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 log = logging.getLogger("anngan.api")
 
 
+def _check_production_secrets(s) -> None:
+    """PRODUCTION không được chạy với khoá mặc định/yếu."""
+    if s.environment != "production":
+        return
+    problems = []
+    if s.secret_key.startswith("CHANGE_ME") or len(s.secret_key) < 32:
+        problems.append("SECRET_KEY")
+    if not s.encryption_key or s.encryption_key.startswith("CHANGE_ME"):
+        problems.append("ENCRYPTION_KEY")
+    if problems:
+        raise RuntimeError(f"Cấu hình không an toàn cho production: đặt {', '.join(problems)} trong .env")
+
+
 def create_app() -> FastAPI:
     s = get_settings()
+    _check_production_secrets(s)
     setup_logging()
     app = FastAPI(
         title=s.app_name,

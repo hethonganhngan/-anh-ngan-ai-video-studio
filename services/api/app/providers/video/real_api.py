@@ -119,8 +119,16 @@ class RealAPIProvider(VideoProvider):
         url = _dig(data, self.config["result_url_path"])
         if not url:
             raise ProviderError(f"{self.name}: chưa có URL kết quả", code="NOT_READY", retryable=True)
+        from urllib.parse import urlparse
+
+        allowed = {urlparse(self.config["submit_url"]).hostname, *self.config.get("result_hosts", [])}
+        host = urlparse(url).hostname
+        if urlparse(url).scheme != "https":
+            raise ProviderError(f"{self.name}: URL kết quả phải là https", code="BAD_RESPONSE", retryable=False)
+        # Chỉ gửi API key tới host đã khai báo (chống rò rỉ khoá tới host lạ)
+        headers = self._headers() if host in allowed else {}
         fd, path = tempfile.mkstemp(suffix=".mp4")
-        with httpx.stream("GET", url, headers=self._headers(), timeout=self.timeout * 5) as r, open(fd, "wb") as f:
+        with httpx.stream("GET", url, headers=headers, timeout=self.timeout * 5) as r, open(fd, "wb") as f:
             if r.status_code >= 400:
                 raise ProviderError(f"{self.name}: tải kết quả lỗi {r.status_code}", code="DOWNLOAD_FAILED")
             for chunk in r.iter_bytes():

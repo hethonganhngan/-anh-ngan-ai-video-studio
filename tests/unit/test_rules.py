@@ -107,3 +107,46 @@ def test_rbac_catalog_integrity():
 def test_qc_has_10_criteria_of_10_points():
     assert len(CRITERIA) == 10 and len({c["key"] for c in CRITERIA}) == 10
     assert {c["method"] for c in CRITERIA} == {"AUTO", "ASSISTED", "MANUAL"}
+
+
+def test_production_refuses_default_secrets():
+    import pytest
+    from app.core.config import Settings
+    from app.main import _check_production_secrets
+
+    with pytest.raises(RuntimeError):
+        _check_production_secrets(Settings(environment="production"))
+    _check_production_secrets(Settings(environment="production", secret_key="x" * 40,
+                                       encryption_key="0dRdc3H0p5gAozqQb3kFQ8sZ4Gk6u2JY8n1HbE7Vd5U="))
+
+
+def test_real_provider_does_not_leak_key_to_foreign_host(monkeypatch):
+    import httpx
+    from app.providers.video.real_api import RealAPIProvider
+
+    seen = {}
+
+    class R:
+        status_code = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def iter_bytes(self):
+            yield b"x"
+
+    def fake_stream(method, url, headers=None, timeout=None):
+        seen[url] = headers
+        return R()
+
+    p = RealAPIProvider("t", "Test", "SECRET", {"submit_url": "https://api.vendor.com/gen", "status_url": "https://api.vendor.com/op/{job_id}",
+                                               "job_id_path": "id", "state_path": "done", "result_url_path": "url"})
+    monkeypatch.setattr(httpx, "stream", fake_stream)
+    for url in ("https://evil.example/v.mp4", "https://api.vendor.com/v.mp4"):
+        monkeypatch.setattr(p, "_request", lambda *a, u=url, **k: type("Resp", (), {"json": lambda self: {"url": u}})())
+        p.get_result("job1")
+    assert seen["https://evil.example/v.mp4"] == {}
+    assert seen["https://api.vendor.com/v.mp4"]["Authorization"] == "Bearer SECRET"
