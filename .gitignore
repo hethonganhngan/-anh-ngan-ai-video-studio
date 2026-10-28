@@ -18,3 +18,5 @@ tests/e2e/playwright-report/
 .env.local
 *.log
 .DS_Store
+*.tsbuildinfo
+tests/e2e/test-results*/
