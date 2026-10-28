@@ -30,8 +30,8 @@ type Dash = {
   simulated_cost: number;
 };
 
-/** Ngày theo giờ địa phương (không dùng toISOString — lệch ngày theo UTC). */
-const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** Ngày theo giờ Việt Nam (doanh nghiệp vận hành theo Asia/Ho_Chi_Minh, không phụ thuộc múi giờ trình duyệt). */
+const iso = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 
 export default function DashboardPage() {
   const { me } = useAuth();
