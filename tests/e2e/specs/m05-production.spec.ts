@@ -78,17 +78,23 @@ test.describe("M05 — Video Production", () => {
     expect(rows[0].scene.status).toBe("QC_FAILED");
   });
 
-  test("vượt ngân sách dự án → bị chặn, hiển thị cảnh báo", async ({ page }) => {
+  test("vượt ngân sách dự án → bị chặn ở kiểm tra tài nguyên và khi tạo cảnh", async ({ page }) => {
     const pm = await apiAs("pm");
+    // Lớp 1: kiểm tra tài nguyên phát hiện vượt ngân sách → không cho tạo cảnh
     const p = await storyboard(pm, { topic: "E2E M05 ngân sách thấp", budget_limit: 10000 });
     await loginUI(page, "pm");
     await page.goto(`/production?project=${p.id}`);
     await page.getByTestId("validate-assets").click();
     await expect(page.getByTestId("asset-report")).toContainText("VƯỢT");
     await expect(page.getByTestId("project-error")).toContainText("ngân sách");
+    expect((await call<any[]>(pm, "get", `/projects/${p.id}/production`)).every((r: any) => r.jobs.length === 0)).toBeTruthy();
+    // Lớp 2: ngân sách bị giảm SAU khi đã kiểm tra → lệnh tạo cảnh bị chặn cứng
+    const p2 = await storyboard(pm, { topic: "E2E M05 ngân sách bị giảm", budget_limit: 500000 });
+    await call(pm, "post", `/projects/${p2.id}/validate-assets`);
+    await call(pm, "patch", `/projects/${p2.id}`, { budget_limit: 10000 });
+    await page.goto(`/production?project=${p2.id}`);
     await page.getByTestId("generate").click();
     await expect(page.getByTestId("budget-error")).toContainText("Vượt ngân sách");
-    const rows = await call<any[]>(pm, "get", `/projects/${p.id}/production`);
-    expect(rows.every((r: any) => r.jobs.length === 0)).toBeTruthy();
+    expect((await call<any[]>(pm, "get", `/projects/${p2.id}/production`)).every((r: any) => r.jobs.length === 0)).toBeTruthy();
   });
 });
