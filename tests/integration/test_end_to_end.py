@@ -135,3 +135,20 @@ def test_full_pipeline(login, channels):
                "GENERATING", "SCENE_QC", "RENDERING", "FINAL_QC", "APPROVAL_PENDING", "APPROVED", "PUBLISH_QUEUED",
                "PUBLISHED", "ANALYTICS_COLLECTION"]:
         assert st in statuses, st
+
+
+def test_ai_director_advances_to_human_gates(login, channels):
+    """A01 (ASSISTED) chạy liên tiếp tới cổng duyệt kịch bản, rồi tới FINAL_QC; không viết kịch bản lặp."""
+    pm = login("pm")
+    p = create_project(pm, channels["CNM"]["id"], topic="AI Director tự chạy tới cổng duyệt", duration_sec=16)
+    r = pm.post(f"/projects/{p['id']}/advance").json()
+    assert r["status"] == "SCRIPT_REVIEW" and r["waiting_for"]
+    assert r["steps"] == ["A02 tạo & chấm 3 ý tưởng", "A02 viết kịch bản & storyboard"]
+    view = pm.get(f"/projects/{p['id']}/script").json()
+    assert len(view["versions"]) == 1
+    pm.post(f"/projects/{p['id']}/script/approve", json={})
+    r = pm.post(f"/projects/{p['id']}/advance").json()
+    assert r["status"] == "FINAL_QC", r
+    assert pm.get(f"/projects/{p['id']}").json()["status"] == "FINAL_QC"
+    r = pm.post(f"/projects/{p['id']}/advance").json()
+    assert r["steps"] == [] and "M07" in r["waiting_for"]

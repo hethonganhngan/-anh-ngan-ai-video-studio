@@ -126,17 +126,20 @@ def retry(project_id: uuid.UUID, data: TransitionIn, ctx: Ctx = Depends(require(
 
     result = retry_project(ctx, project_id, data.note)
     ctx.db.commit()
-    return result
+    ctx.db.expire_all()
+    return {**result, "status": service.get_project(ctx, project_id).status}
 
 
 @router.post("/{project_id}/advance")
 def advance(project_id: uuid.UUID, ctx: Ctx = Depends(require("project.edit"))):
     """A01 AI Director: chạy các bước tự động kế tiếp theo mức tự động hoá (dừng ở mọi điểm cần con người duyệt)."""
-    from app.workflows.orchestrator import advance_project
+    from app.workflows.orchestrator import HUMAN_GATES, advance_project
 
     result = advance_project(ctx, project_id)
     ctx.db.commit()
-    return result
+    ctx.db.expire_all()  # tác vụ nền (eager) có thể đã tiến thêm sau commit
+    status = service.get_project(ctx, project_id).status
+    return {**result, "status": status, "waiting_for": HUMAN_GATES.get(status)}
 
 
 @router.post("/{project_id}/resolve-manual")

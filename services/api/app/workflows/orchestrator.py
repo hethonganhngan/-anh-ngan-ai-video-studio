@@ -70,7 +70,7 @@ def advance_project(ctx: Ctx, project_id) -> dict:
     def work(_llm, actx):
         max_steps = 1 if p.automation_level == "MANUAL" else 8
         for _ in range(max_steps):
-            ctx.db.refresh(p)
+            ctx.db.flush()  # KHÔNG refresh: sẽ huỷ thay đổi chưa flush của chính vòng trước
             try:
                 done = _step(ctx, p)
             except AppError as e:
@@ -82,7 +82,7 @@ def advance_project(ctx: Ctx, project_id) -> dict:
         return {"result": steps, "count": len(steps)}, None
 
     run_agent(ctx, "A01", "project.orchestrate", work, project=p, input_ref={"project": p.code, "status": p.status})
-    ctx.db.refresh(p)
+    ctx.db.flush()
     return {"steps": steps, "status": p.status, "waiting_for": HUMAN_GATES.get(p.status)}
 
 
