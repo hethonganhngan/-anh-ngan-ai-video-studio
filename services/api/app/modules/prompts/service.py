@@ -2,14 +2,13 @@
 import uuid
 from datetime import datetime, timezone
 
-from jinja2 import TemplateSyntaxError
-from jinja2.sandbox import SandboxedEnvironment
-from sqlalchemy import func, select
-
 from app.core import audit
 from app.core.context import Ctx
 from app.core.errors import NotFound, ValidationFailed
 from app.modules.prompts.models import PromptTemplate, PromptVersion
+from jinja2 import TemplateSyntaxError
+from jinja2.sandbox import SandboxedEnvironment
+from sqlalchemy import func, select
 
 _env = SandboxedEnvironment(autoescape=False)
 PROMPT_PARTS = ["scene_type", "characters", "action", "setting", "camera", "lighting", "sound", "dialogue", "negative"]
@@ -118,7 +117,9 @@ def build_scene_prompt(ctx: Ctx, project, scene) -> dict:
     if lock_id:
         sl = ctx.db.get(SceneLock, lock_id)
         if sl is not None:
-            setting = f"{sl.lock_data.get('setting', sl.name)}; đạo cụ: {sl.lock_data.get('props', '')}; màu chủ đạo: {sl.lock_data.get('colors', '')} [Scene Lock {sl.code} v{sl.version_no}]"
+            ld = sl.lock_data
+            setting = (f"{ld.get('setting', sl.name)}; đạo cụ: {ld.get('props', '')}; màu chủ đạo: {ld.get('colors', '')} "
+                       f"[Scene Lock {sl.code} v{sl.version_no}]")
             scene_lock_info = {"code": sl.code, "version": sl.version_no}
     dialogue = " / ".join(f"{d.get('speaker', '')}: \"{d.get('text', '')}\"" for d in (scene.dialogue or [])) or "Không thoại"
     negative = ver.negative_prompt

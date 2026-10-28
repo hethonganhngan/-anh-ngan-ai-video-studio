@@ -6,8 +6,6 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, select
-
 from app.agents.runner import run_agent
 from app.core import audit
 from app.core.context import Ctx
@@ -22,6 +20,7 @@ from app.modules.publishing.models import Publication
 from app.modules.publishing.service import get_pub
 from app.modules.quality.models import QCReview
 from app.workflows import state_machine as sm
+from sqlalchemy import func, select
 
 METRICS = ["views", "likes", "comments", "shares", "saves", "retention_rate", "avg_watch_sec", "conversions"]
 IN_PRODUCTION = ["SCRIPT_GENERATING", "SCRIPT_REVIEW", "STORYBOARD_READY", "ASSET_VALIDATION", "GENERATION_QUEUED",
@@ -233,7 +232,7 @@ def dashboard(ctx: Ctx, *, channel_id=None, date_from=None, date_to=None, projec
     verified = [c for c in with_capa if c.status in ("VERIFIED", "STANDARDIZED", "CLOSED")]
     capa_rate = round(len(verified) / len(with_capa) * 100, 1) if with_capa else None
 
-    perf = performance(ctx, channel_id=channel_id)
+    perf = performance(ctx, channel_id=channel_id, date_from=date_from, date_to=date_to)
     perf = [r for r in perf if (not ids or r["project_id"] in {str(i) for i in ids})]
     with_data = [r for r in perf if r["has_data"]]
     total_views = sum(r["views"] for r in with_data)

@@ -3,13 +3,22 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
+from app.db.base import Base, DataModeMixin, SoftDeleteMixin, TimestampMixin, UUIDMixin, utcnow
 from sqlalchemy import (
-    Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Table, Text, UniqueConstraint, Index,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.base import Base, DataModeMixin, SoftDeleteMixin, TimestampMixin, UUIDMixin, utcnow
 
 role_permissions = Table(
     "role_permissions",

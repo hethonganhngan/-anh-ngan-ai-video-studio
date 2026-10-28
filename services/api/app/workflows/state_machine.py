@@ -90,8 +90,10 @@ def transition(ctx: Ctx, project: Project, target: str, *, note: str = "", paylo
             f"Không thể chuyển {current} → {target}",
             details={"current": current, "target": target, "allowed": sorted(TRANSITIONS.get(current, set()))},
         )
-    if target == "RETRY_PENDING":
-        project.resume_status = current if current in RETRYABLE else (project.resume_status or "GENERATING")
+    if target in ("FAILED", "RETRY_PENDING") and current in RETRYABLE:
+        project.resume_status = current  # ghi nhớ bước lỗi để retry đúng bước
+    elif target == "RETRY_PENDING" and not project.resume_status:
+        project.resume_status = "GENERATING"
     if current == "RETRY_PENDING" and target != "CANCELLED":
         if project.resume_status and target != project.resume_status:
             raise InvalidTransition(f"Chỉ được chạy lại bước {project.resume_status}",

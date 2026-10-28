@@ -2,18 +2,22 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Header, Query
-from pydantic import BaseModel
-
 from app.api.deps import require
 from app.api.schemas import Page
 from app.core.context import Ctx
 from app.modules.projects import service
 from app.modules.projects.models import Channel
 from app.modules.projects.schemas import (
-    CreateResult, ProjectCreate, ProjectOut, ProjectUpdate, TransitionIn, WorkflowEventOut,
+    CreateResult,
+    ProjectCreate,
+    ProjectOut,
+    ProjectUpdate,
+    TransitionIn,
+    WorkflowEventOut,
 )
 from app.workflows import state_machine as sm
+from fastapi import APIRouter, Depends, Header, Query
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/projects", tags=["B01 Project Manager"])
 
@@ -43,8 +47,19 @@ def create(data: ProjectCreate, idempotency_key: str | None = Header(default=Non
            ctx: Ctx = Depends(require("project.create"))):
     if idempotency_key and not data.idempotency_key:
         data.idempotency_key = idempotency_key
-    result = service.create_projects(ctx, data)
-    ctx.db.commit()
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        result = service.create_projects(ctx, data)
+        ctx.db.commit()
+    except IntegrityError:
+        # Request trùng idempotency_key chạy song song: bản kia đã commit trước → trả về bản đã có
+        ctx.db.rollback()
+        if not data.idempotency_key:
+            raise
+        result = service.create_projects(ctx, data)
+        if not result["duplicate"]:
+            raise
     return result
 
 

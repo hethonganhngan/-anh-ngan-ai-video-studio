@@ -2,11 +2,10 @@
 import uuid
 from datetime import datetime
 
+from app.db.base import Base, TimestampMixin, UUIDMixin
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.base import Base, TimestampMixin, UUIDMixin
 
 
 class PromptTemplate(UUIDMixin, TimestampMixin, Base):

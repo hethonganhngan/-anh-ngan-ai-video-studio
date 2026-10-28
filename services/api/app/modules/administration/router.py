@@ -3,10 +3,6 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
-
 from app.api.deps import require
 from app.api.schemas import ORM, Email, Page
 from app.core import audit
@@ -15,8 +11,19 @@ from app.core.errors import NotFound, ValidationFailed
 from app.core.security import encrypt_secret, mask_secret
 from app.modules.administration import backup, service
 from app.modules.administration.models import (
-    AuditLog, BackupRecord, BudgetLimit, CostRecord, Notification, Permission, ProviderAccount, Role, User,
+    AuditLog,
+    BackupRecord,
+    BudgetLimit,
+    CostRecord,
+    Notification,
+    Permission,
+    ProviderAccount,
+    Role,
+    User,
 )
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 
 router = APIRouter(prefix="/admin", tags=["B12 Administration & Cost Manager"])
 
@@ -65,6 +72,7 @@ class ProviderPatch(BaseModel):
     config: dict | None = None
     api_key: str | None = Field(default=None, min_length=8, max_length=4000)
     unit_cost: Decimal | None = Field(default=None, ge=0)
+    clear_api_key: bool = False
 
 
 class BudgetOut(ORM):
@@ -196,7 +204,14 @@ def update_provider(pid: uuid.UUID, data: ProviderPatch, ctx: Ctx = Depends(requ
     if data.unit_cost is not None:
         acc.unit_cost = data.unit_cost
         changes["unit_cost"] = float(data.unit_cost)
-    if data.api_key:
+    if data.clear_api_key:
+        acc.secret_encrypted = None
+        acc.secret_last4 = None
+        acc.is_enabled = False
+        acc.connection_status = "NOT_CONFIGURED"
+        acc.last_verified_at = None
+        changes["api_key"] = "CLEARED"
+    elif data.api_key:
         acc.secret_encrypted = encrypt_secret(data.api_key)
         acc.secret_last4 = mask_secret(data.api_key)
         acc.connection_status = "CONFIGURED_UNVERIFIED"

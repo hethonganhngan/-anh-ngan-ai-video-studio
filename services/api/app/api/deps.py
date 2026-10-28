@@ -3,15 +3,14 @@ import uuid
 from collections.abc import Callable
 
 import jwt
-from fastapi import Depends, Request
-from sqlalchemy.orm import Session
-
 from app.core.context import Actor, Ctx
 from app.core.errors import Forbidden, Unauthorized
 from app.core.security import decode_token
 from app.db.session import get_db
 from app.modules.administration.models import User
 from app.modules.administration.service import get_mode
+from fastapi import Depends, Request
+from sqlalchemy.orm import Session
 
 ACCESS_COOKIE = "an_access"
 CSRF_COOKIE = "an_csrf"

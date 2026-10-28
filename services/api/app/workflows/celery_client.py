@@ -1,9 +1,8 @@
 """Gửi tác vụ sang Celery worker. Chế độ eager (test/dev không có worker) chạy đồng bộ trong tiến trình."""
 import logging
 
-from celery import Celery
-
 from app.core.config import get_settings
+from celery import Celery
 
 log = logging.getLogger("anngan.celery")
 _celery: Celery | None = None

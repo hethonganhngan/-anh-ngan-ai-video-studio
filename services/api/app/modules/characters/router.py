@@ -1,17 +1,26 @@
 """B03 API — Character & Voice Studio (M04)."""
 import uuid
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-
 from app.api.deps import require
 from app.core.context import Ctx
 from app.core.errors import ValidationFailed
 from app.modules.characters import service
 from app.modules.characters.schemas import (
-    CONSENT, CharacterIn, CharacterOut, CharacterPatch, LockOut, ReferenceIn, ReferenceOut, SceneLockIn, SceneLockOut,
-    VoiceIn, VoiceOut, VoicePatch,
+    CONSENT,
+    CharacterIn,
+    CharacterOut,
+    CharacterPatch,
+    LockOut,
+    ReferenceIn,
+    ReferenceOut,
+    SceneLockIn,
+    SceneLockOut,
+    VoiceIn,
+    VoiceOut,
+    VoicePatch,
 )
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 router = APIRouter(tags=["B03 Character & Voice Manager"])
 

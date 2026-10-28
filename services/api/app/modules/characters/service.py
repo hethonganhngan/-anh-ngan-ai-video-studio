@@ -2,16 +2,20 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
-
 from app.core import audit
 from app.core.codes import next_code
 from app.core.context import Ctx
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.media.models import Asset
 from app.modules.characters.models import (
-    Character, CharacterLock, CharacterReference, SceneLock, VoiceLock, VoiceProfile,
+    Character,
+    CharacterLock,
+    CharacterReference,
+    SceneLock,
+    VoiceLock,
+    VoiceProfile,
 )
+from sqlalchemy import func, select
 
 REQUIRED_REFS = ["FRONT", "THREE_QUARTER", "FULL_BODY"]
 REF_TYPES = set(REQUIRED_REFS) | {"EXPRESSION", "OUTFIT"}

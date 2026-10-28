@@ -2,10 +2,9 @@
 import uuid
 from datetime import datetime
 
+from app.db.base import Base, DataModeMixin, TimestampMixin, UUIDMixin, utcnow
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.base import Base, DataModeMixin, TimestampMixin, UUIDMixin, utcnow
 
 
 class AnalyticsSnapshot(UUIDMixin, TimestampMixin, DataModeMixin, Base):

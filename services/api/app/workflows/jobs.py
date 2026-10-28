@@ -7,12 +7,11 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, select
-
 from app.core.context import Actor, Ctx
 from app.core.errors import AppError, BudgetExceeded
 from app.db.session import SessionLocal
 from app.workflows.dispatch import defer
+from sqlalchemy import func, select
 
 log = logging.getLogger("anngan.jobs")
 TERMINAL = {"SUCCEEDED", "FAILED", "CANCELLED", "BLOCKED_BUDGET"}

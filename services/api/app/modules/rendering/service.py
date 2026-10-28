@@ -5,8 +5,6 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
-
 from app.core import audit
 from app.core.config import get_settings
 from app.core.context import Ctx
@@ -19,6 +17,7 @@ from app.modules.rendering.models import Render, RenderJob
 from app.modules.scripts.models import Scene
 from app.workflows import state_machine as sm
 from app.workflows.dispatch import defer
+from sqlalchemy import func, select
 
 LOGO_POSITIONS = {"top_right", "top_left", "bottom_right", "bottom_left"}
 

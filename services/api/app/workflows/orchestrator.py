@@ -2,13 +2,12 @@
 
 Nguyên tắc: Agent chỉ chạy các bước tự động; dừng ở mọi cổng cần con người (duyệt kịch bản, QC tổng thể,
 phê duyệt phát hành, xuất bản). MANUAL: mỗi lần advance chạy 1 bước; ASSISTED/AUTO: chạy liên tiếp tới cổng kế."""
-from sqlalchemy import select
-
 from app.agents.runner import run_agent
 from app.core.context import Ctx
 from app.core.errors import AppError, InvalidTransition, ValidationFailed
 from app.modules.projects.service import get_project, lock_project
 from app.workflows import state_machine as sm
+from sqlalchemy import select
 
 HUMAN_GATES = {
     "SCRIPT_REVIEW": "Chờ duyệt kịch bản (M03)",
@@ -149,12 +148,12 @@ def resolve_manual_action(ctx: Ctx, project_id, note: str) -> dict:
 
 
 def project_overview(ctx: Ctx, project_id) -> dict:
+    from app.modules.administration.service import spent
     from app.modules.generation.models import GenerationJob
     from app.modules.projects.schemas import ProjectOut, WorkflowEventOut
     from app.modules.projects.service import events
     from app.modules.rendering.models import Render, RenderJob
     from app.modules.scripts.models import Scene
-    from app.modules.administration.service import spent
 
     p = get_project(ctx, project_id)
     scenes = ctx.db.scalars(select(Scene).where(Scene.project_id == p.id).order_by(Scene.order_index)).all()

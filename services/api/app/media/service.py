@@ -6,8 +6,6 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import or_, select, func, String, cast
-
 from app.core import audit
 from app.core.config import get_settings
 from app.core.context import Ctx
@@ -15,6 +13,7 @@ from app.core.errors import NotFound, ValidationFailed
 from app.media.models import Asset
 from app.media.probe import ffprobe, summarize
 from app.media.storage import get_storage
+from sqlalchemy import String, cast, func, or_, select
 
 ALLOWED = {
     ".mp4": ("video/mp4", "VIDEO"), ".mov": ("video/quicktime", "VIDEO"), ".webm": ("video/webm", "VIDEO"),

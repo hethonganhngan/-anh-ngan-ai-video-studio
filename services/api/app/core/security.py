@@ -5,11 +5,10 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError, InvalidHashError
-from cryptography.fernet import Fernet, InvalidToken
-
 from app.core.config import get_settings
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
+from cryptography.fernet import Fernet, InvalidToken
 
 _ph = PasswordHasher()
 JWT_ALG = "HS256"

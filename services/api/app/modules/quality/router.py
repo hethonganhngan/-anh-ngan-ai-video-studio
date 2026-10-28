@@ -2,10 +2,6 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
-
 from app.api.deps import require
 from app.api.schemas import ORM
 from app.core.context import Ctx
@@ -14,6 +10,9 @@ from app.modules.projects.schemas import ProjectOut
 from app.modules.quality import service
 from app.modules.quality.criteria import CRITERIA
 from app.modules.quality.models import QCFinding
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 
 router = APIRouter(tags=["B07 Quality Control Engine"])
 

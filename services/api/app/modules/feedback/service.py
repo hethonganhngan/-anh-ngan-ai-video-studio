@@ -7,8 +7,6 @@ Nguyên tắc: không đóng khi thiếu bằng chứng; không tuyên bố đã
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select
-
 from app.agents.runner import run_agent
 from app.core import audit
 from app.core.codes import next_code
@@ -17,6 +15,7 @@ from app.core.errors import InvalidTransition, NotFound, ValidationFailed
 from app.modules.administration.models import User
 from app.modules.administration.service import notify
 from app.modules.feedback.models import CAPAAction, FeedbackCase, FeedbackEvent, RootCauseAnalysis, VerificationResult
+from sqlalchemy import func, or_, select
 
 STATUSES = ["NEW", "VALIDATED", "RCA_PENDING", "ACTION_APPROVED", "IN_PROGRESS", "VERIFY_PENDING", "VERIFIED",
             "STANDARDIZED", "CLOSED", "REOPENED"]

@@ -2,8 +2,6 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import func, select
-
 from app.agents.runner import run_agent
 from app.core import audit
 from app.core.context import Ctx
@@ -20,6 +18,7 @@ from app.providers.video.base import GenerationSpec
 from app.providers.video.registry import get_video_provider
 from app.workflows import state_machine as sm
 from app.workflows.dispatch import defer
+from sqlalchemy import func, select
 
 ACTIVE = ["QUEUED", "SUBMITTED", "RUNNING", "RETRY_PENDING"]
 
@@ -137,6 +136,10 @@ def queue_generation(ctx: Ctx, project_id, scene_ids: list | None = None) -> lis
     p = lock_project(ctx, project_id)
     if p.status not in ("GENERATION_QUEUED", "GENERATING", "SCENE_QC", "FINAL_QC", "NEEDS_MANUAL_ACTION", "RETRY_PENDING"):
         raise InvalidTransition(f"Không thể tạo cảnh ở trạng thái {p.status}")
+    if p.status == "NEEDS_MANUAL_ACTION" and not ctx.db.scalar(
+            select(GenerationJob.id).where(GenerationJob.project_id == p.id).limit(1)):
+        raise InvalidTransition("Dự án chưa qua kiểm tra tài nguyên — xử lý vấn đề rồi chạy lại 'Kiểm tra tài nguyên'",
+                                code="ASSET_VALIDATION_REQUIRED")
     provider = get_video_provider(ctx.db, p.video_provider_code, ctx.mode)
     scenes = _scenes(ctx, p)
     targets = [s for s in scenes if (scene_ids and str(s.id) in {str(x) for x in scene_ids})

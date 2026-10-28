@@ -1,8 +1,5 @@
 """Chọn Video Provider theo chế độ. DEMO: chỉ mock + manual_flow (không gọi API tính phí).
 PRODUCTION: manual_flow + provider REAL_API đã bật và có key; KHÔNG cho dùng mock."""
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.core.errors import ProviderUnavailable, ValidationFailed
 from app.core.security import decrypt_secret
 from app.modules.administration.models import ProviderAccount
@@ -10,6 +7,8 @@ from app.providers.video.base import VideoProvider
 from app.providers.video.manual_flow import ManualFlowProvider
 from app.providers.video.mock import MockVideoProvider
 from app.providers.video.real_api import RealAPIProvider
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 BUILTIN = {"mock": MockVideoProvider, "manual_flow": ManualFlowProvider}
 

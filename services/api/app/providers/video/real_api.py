@@ -18,7 +18,6 @@ import tempfile
 from decimal import Decimal
 
 import httpx
-
 from app.providers.video.base import GenerationSpec, ProviderError, ProviderStatus, VideoProvider
 
 

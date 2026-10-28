@@ -2,9 +2,8 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator
-
 from app.api.schemas import ORM
+from pydantic import BaseModel, Field, field_validator
 
 AUTOMATION = {"MANUAL", "ASSISTED", "AUTO"}
 

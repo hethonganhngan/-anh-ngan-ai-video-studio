@@ -1,7 +1,8 @@
 """Schema dùng chung."""
-from typing import Generic, TypeVar
+import re as _re
+from typing import Annotated, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import AfterValidator, BaseModel, ConfigDict
 
 T = TypeVar("T")
 
@@ -21,11 +22,6 @@ class Message(BaseModel):
     ok: bool = True
     message: str = ""
 
-
-import re as _re
-from typing import Annotated
-
-from pydantic import AfterValidator
 
 _EMAIL_RE = _re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)+$")
 

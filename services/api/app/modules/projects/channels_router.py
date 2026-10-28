@@ -2,15 +2,14 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
-
 from app.api.deps import require
 from app.core import audit
 from app.core.context import Ctx
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.modules.projects.models import BrandProfile, Channel, Project
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 
 router = APIRouter(prefix="/channels", tags=["M13 Kênh & Brand DNA"])
 BRAND_FIELDS = ["slogan", "brand_promise", "big_idea", "brand_voice", "audience", "content_pillars", "character_set",

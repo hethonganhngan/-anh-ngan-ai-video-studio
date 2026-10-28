@@ -2,11 +2,10 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Integer, String, Text, Index
+from app.db.base import Base, DataModeMixin, SoftDeleteMixin, TimestampMixin, UUIDMixin
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.base import Base, DataModeMixin, SoftDeleteMixin, TimestampMixin, UUIDMixin
 
 
 class Asset(UUIDMixin, TimestampMixin, SoftDeleteMixin, DataModeMixin, Base):

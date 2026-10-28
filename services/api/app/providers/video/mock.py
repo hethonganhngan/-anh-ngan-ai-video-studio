@@ -60,7 +60,7 @@ class MockVideoProvider(VideoProvider):
         s = get_settings()
         w, h = (s.mock_video_width, s.mock_video_height) if spec.aspect_ratio == "9:16" else (spec.width, spec.height)
         color = PALETTE[int(hashlib.md5(spec.job_ref.encode()).hexdigest(), 16) % len(PALETTE)]
-        lines = [l.get("text", "") if isinstance(l, dict) else str(l) for l in (spec.dialogue or [])][:2]
+        lines = [d.get("text", "") if isinstance(d, dict) else str(d) for d in (spec.dialogue or [])][:2]
         title = (spec.scene_title or "Cảnh")[:60]
         fs_title, fs_body = max(18, w // 18), max(14, w // 30)
         with tempfile.TemporaryDirectory() as td:

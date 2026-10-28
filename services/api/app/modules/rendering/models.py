@@ -2,11 +2,10 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, BigInteger
+from app.db.base import Base, DataModeMixin, TimestampMixin, UUIDMixin
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.base import Base, DataModeMixin, TimestampMixin, UUIDMixin
 
 
 class RenderJob(UUIDMixin, TimestampMixin, DataModeMixin, Base):

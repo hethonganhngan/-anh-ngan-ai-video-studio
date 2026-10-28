@@ -1,9 +1,8 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
-
 from app.api.schemas import ORM
+from pydantic import BaseModel, Field
 
 
 class DialogueLine(BaseModel):

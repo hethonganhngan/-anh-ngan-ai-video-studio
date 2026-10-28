@@ -2,14 +2,8 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel, Field
-
-from app.api.schemas import Email
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.api.deps import ACCESS_COOKIE, CSRF_COOKIE, get_ctx, get_current_user
+from app.api.schemas import Email
 from app.core import audit
 from app.core.config import get_settings
 from app.core.context import Actor, Ctx
@@ -19,6 +13,10 @@ from app.core.security import create_access_token, hash_password, validate_passw
 from app.db.session import get_db
 from app.modules.administration.models import User
 from app.modules.administration.service import get_mode
+from fastapi import APIRouter, Depends, Request, Response
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 MAX_FAILED = 5

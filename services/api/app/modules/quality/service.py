@@ -1,8 +1,5 @@
 """B07 — Quality Control Engine."""
-import uuid
 from datetime import datetime, timezone
-
-from sqlalchemy import select
 
 from app.agents.runner import run_agent
 from app.core import audit
@@ -18,6 +15,7 @@ from app.modules.quality.models import Approval, QCFinding, QCReview
 from app.modules.rendering.models import Render
 from app.modules.scripts.models import Scene, Script, ScriptVersion
 from app.workflows import state_machine as sm
+from sqlalchemy import select
 
 
 def _now():

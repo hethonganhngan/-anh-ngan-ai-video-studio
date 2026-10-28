@@ -3,18 +3,18 @@ import logging
 import time
 import uuid
 
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from sqlalchemy.exc import IntegrityError, DBAPIError
-
-from app.api.health import LATENCY, REQUESTS, router as health_router
+from app.api.health import LATENCY, REQUESTS
+from app.api.health import router as health_router
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.logging import setup_logging
 from app.core.rate_limit import hit
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
 log = logging.getLogger("anngan.api")
 

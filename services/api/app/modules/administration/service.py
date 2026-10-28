@@ -3,16 +3,20 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
-
 from app.core import audit
 from app.core.context import Ctx
 from app.core.errors import BudgetExceeded, Conflict, NotFound, ValidationFailed
 from app.core.security import hash_password, validate_password_strength
 from app.modules.administration.models import (
-    BudgetLimit, CostRecord, Notification, Role, SystemSetting, User,
+    BudgetLimit,
+    CostRecord,
+    Notification,
+    Role,
+    SystemSetting,
+    User,
 )
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 DEFAULT_SETTINGS: dict[str, dict] = {
     "system.mode": {"value": "DEMO"},

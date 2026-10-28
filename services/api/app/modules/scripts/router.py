@@ -1,14 +1,13 @@
 """B02 API — AI Script & Storyboard (M03)."""
 import uuid
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
-
 from app.api.deps import require
 from app.core.context import Ctx
 from app.modules.projects.schemas import ProjectOut
 from app.modules.scripts import service
 from app.modules.scripts.schemas import SceneOut, SceneUpdate, ScriptIn, ScriptOut, ScriptVersionOut
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["B02 AI Script Engine"])
 

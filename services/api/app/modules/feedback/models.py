@@ -2,11 +2,10 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, Index
+from app.db.base import Base, DataModeMixin, TimestampMixin, UUIDMixin, utcnow
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.base import Base, DataModeMixin, TimestampMixin, UUIDMixin, utcnow
 
 
 class FeedbackCase(UUIDMixin, TimestampMixin, DataModeMixin, Base):

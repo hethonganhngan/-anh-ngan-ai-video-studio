@@ -2,8 +2,6 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
-
 from app.agents.roles import script_agent as A02
 from app.agents.runner import run_agent
 from app.core import audit
@@ -18,6 +16,7 @@ from app.modules.quality.compliance import scan
 from app.modules.scripts.models import Scene, SceneVersion, Script, ScriptVersion
 from app.modules.scripts.validation import validate_scenes
 from app.workflows import state_machine as sm
+from sqlalchemy import func, select
 
 SCENE_FIELDS = ["title", "scene_type", "action", "dialogue", "setting", "camera", "lighting", "sound", "duration_sec",
                 "character_ids", "scene_lock_id"]

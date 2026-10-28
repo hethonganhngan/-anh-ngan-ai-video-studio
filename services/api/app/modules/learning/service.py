@@ -1,8 +1,6 @@
 """B09 — AI Lessons Learned Engine. Bài học chỉ đi vào cấu hình chuẩn sau khi được duyệt; có rollback."""
 from datetime import datetime, timezone
 
-from sqlalchemy import String, cast, func, or_, select
-
 from app.agents.runner import run_agent
 from app.core import audit
 from app.core.codes import next_code
@@ -12,6 +10,7 @@ from app.modules.feedback.models import CAPAAction, FeedbackCase, RootCauseAnaly
 from app.modules.learning.models import LessonLearned
 from app.modules.prompts import service as prompts
 from app.modules.prompts.models import PromptTemplate, PromptVersion
+from sqlalchemy import String, cast, func, or_, select
 
 LESSON_TYPES = {"RESOLVED_ERROR", "FAILED_PROMPT", "EFFECTIVE_PROMPT", "GOOD_VOICE_LOCK", "GOOD_CHARACTER_LOCK", "ROOT_CAUSE",
                 "EFFECTIVE_CAPA"}

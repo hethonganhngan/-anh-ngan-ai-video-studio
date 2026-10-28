@@ -69,20 +69,23 @@ class Api:
         self.c = client
         self.h = {"Authorization": f"Bearer {token}"}
 
+    def _h(self, kw):
+        return {**self.h, **kw.pop("headers", {})}
+
     def get(self, url, **kw):
-        return self.c.get(f"/api/v1{url}", headers=self.h, **kw)
+        return self.c.get(f"/api/v1{url}", headers=self._h(kw), **kw)
 
     def post(self, url, json=None, **kw):
-        return self.c.post(f"/api/v1{url}", headers=self.h, json=json, **kw)
+        return self.c.post(f"/api/v1{url}", headers=self._h(kw), json=json, **kw)
 
     def put(self, url, json=None, **kw):
-        return self.c.put(f"/api/v1{url}", headers=self.h, json=json, **kw)
+        return self.c.put(f"/api/v1{url}", headers=self._h(kw), json=json, **kw)
 
     def patch(self, url, json=None, **kw):
-        return self.c.patch(f"/api/v1{url}", headers=self.h, json=json, **kw)
+        return self.c.patch(f"/api/v1{url}", headers=self._h(kw), json=json, **kw)
 
     def delete(self, url, **kw):
-        return self.c.delete(f"/api/v1{url}", headers=self.h, **kw)
+        return self.c.delete(f"/api/v1{url}", headers=self._h(kw), **kw)
 
 
 ROLE_USERS = {

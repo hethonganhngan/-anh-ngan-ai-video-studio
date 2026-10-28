@@ -2,13 +2,12 @@
 import shutil
 import time
 
+from app.core.config import get_settings
+from app.db.session import get_db
 from fastapi import APIRouter, Depends, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
-from app.core.config import get_settings
-from app.db.session import get_db
 
 router = APIRouter(tags=["Health"])
 

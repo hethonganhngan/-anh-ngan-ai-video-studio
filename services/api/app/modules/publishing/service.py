@@ -5,8 +5,6 @@ import zipfile
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from sqlalchemy import select
-
 from app.core import audit
 from app.core.context import Ctx
 from app.core.errors import InvalidTransition, NotFound, ProviderUnavailable, ValidationFailed
@@ -20,6 +18,7 @@ from app.modules.quality.compliance import scan
 from app.modules.rendering.models import Render
 from app.providers.publishing.base import PUBLISHERS, URL_DOMAINS, PublisherNotConnected
 from app.workflows import state_machine as sm
+from sqlalchemy import select
 
 PLATFORMS = set(PUBLISHERS)
 PUBLISHABLE = {"APPROVED", "PUBLISH_QUEUED", "PUBLISHED", "ANALYTICS_COLLECTION", "FEEDBACK_REVIEW"}

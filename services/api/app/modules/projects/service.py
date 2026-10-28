@@ -3,8 +3,6 @@ import math
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
-
 from app.core import audit
 from app.core.codes import next_code
 from app.core.context import Ctx
@@ -15,6 +13,7 @@ from app.modules.projects.models import Channel, ProductionBatch, Project, Workf
 from app.modules.projects.schemas import ProjectCreate, ProjectUpdate
 from app.providers.video.registry import get_video_provider
 from app.workflows import state_machine as sm
+from sqlalchemy import func, or_, select
 
 
 def get_project(ctx: Ctx, project_id) -> Project:

@@ -2,11 +2,10 @@
 import uuid
 from datetime import datetime
 
+from app.db.base import Base, DataModeMixin, TimestampMixin, UUIDMixin
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.base import Base, DataModeMixin, TimestampMixin, UUIDMixin
 
 
 class LessonLearned(UUIDMixin, TimestampMixin, DataModeMixin, Base):

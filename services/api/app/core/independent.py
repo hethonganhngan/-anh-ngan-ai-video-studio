@@ -1,9 +1,8 @@
 """Ghi bản ghi bằng session độc lập — dùng cho log lỗi/audit phải tồn tại kể cả khi transaction chính rollback."""
 import logging
 
-from sqlalchemy import text
-
 from app.db.session import SessionLocal
+from sqlalchemy import text
 
 log = logging.getLogger("anngan.independent")
 

@@ -7,9 +7,8 @@
 import hashlib
 import math
 
-from jinja2.sandbox import SandboxedEnvironment
-
 from app.modules.quality.compliance import has_critical, scan
+from jinja2.sandbox import SandboxedEnvironment
 
 _env = SandboxedEnvironment(autoescape=False)
 
@@ -89,7 +88,6 @@ def score_idea(idea: dict, brief: dict) -> dict:
 
 def mock_script(brief: dict, idea: dict, characters: list[dict], scene_seconds: int) -> dict:
     n = max(1, math.ceil(brief["duration_sec"] / scene_seconds))
-    topic = brief["topic"].rstrip(".")
     cta = brief.get("cta") or "Mẹ ghé cửa hàng Ánh Ngân gần nhất hoặc nhắn tin để được tư vấn theo nhu cầu của bé nhé."
     mom = next((c for c in characters if "mẹ" in c["name"].lower()), None) or {"name": "Mẹ Lan", "code": ""}
     staff = next((c for c in characters if c is not mom), None) or {"name": "Chị Ngân – tư vấn viên", "code": ""}

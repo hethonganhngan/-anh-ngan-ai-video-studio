@@ -1,6 +1,4 @@
 """Gộp router của 12 module + media + agents."""
-from fastapi import APIRouter
-
 from app.agents.router import router as agents_router
 from app.api import auth
 from app.media.router import router as media_router
@@ -17,6 +15,7 @@ from app.modules.publishing.router import router as publishing_router
 from app.modules.quality.router import router as quality_router
 from app.modules.rendering.router import router as rendering_router
 from app.modules.scripts.router import router as scripts_router
+from fastapi import APIRouter
 
 api_router = APIRouter()
 for r in (auth.router, projects_router, channels_router, scripts_router, characters_router, prompts_router,

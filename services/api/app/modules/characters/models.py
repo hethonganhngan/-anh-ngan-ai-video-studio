@@ -2,11 +2,10 @@
 import uuid
 from datetime import datetime
 
+from app.db.base import Base, DataModeMixin, SoftDeleteMixin, TimestampMixin, UUIDMixin
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.base import Base, DataModeMixin, SoftDeleteMixin, TimestampMixin, UUIDMixin
 
 
 class Character(UUIDMixin, TimestampMixin, SoftDeleteMixin, DataModeMixin, Base):

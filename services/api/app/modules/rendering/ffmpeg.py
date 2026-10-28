@@ -155,7 +155,7 @@ def build_command(plan: RenderPlan) -> list[str]:
         fc.append(f"[{vlabel}][lg]overlay={pos}:format=auto[vl]")
         vlabel = "vl"
     mix = ["[ac]"]
-    for j, vo in zip(vo_idx, plan.voiceovers):
+    for j, vo in zip(vo_idx, plan.voiceovers, strict=False):
         delay = int(vo.start * 1000)
         fc.append(f"[{j}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={vo.volume:.2f},"
                   f"adelay={delay}|{delay}[vo{j}]")

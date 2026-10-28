@@ -9,9 +9,6 @@ import argparse
 import sys
 from decimal import Decimal
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.agents.models import AgentConfig
 from app.agents.registry import AGENTS, MOCK_LLM, RULE_ENGINE
 from app.core.config import get_settings
@@ -23,6 +20,8 @@ from app.modules.administration.service import DEFAULT_SETTINGS
 from app.modules.projects.models import BrandProfile, Channel
 from app.modules.prompts.models import PromptTemplate, PromptVersion
 from app.seed.catalog import CHANNELS, DEMO_USERS, PROMPT_TEMPLATES, PROVIDERS
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 def seed_rbac(db: Session) -> dict[str, Role]:

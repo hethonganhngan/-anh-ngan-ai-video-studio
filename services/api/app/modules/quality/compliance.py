@@ -7,9 +7,9 @@ Quy tắc chính:
 """
 import re
 import unicodedata
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 
-SUBSTITUTE_PRODUCT = r"(sữa công thức|sữa bột|sữa bình|sữa thay thế|bình bú|núm vú giả|formula)"
+SUBSTITUTE_PRODUCT = r"(sữa(?!\s*mẹ)|bình bú|núm vú|formula|bột ăn dặm)"  # mọi sản phẩm sữa trừ sữa mẹ
 UNDER_24M = (r"(dưới\s*24\s*tháng|dưới\s*2\s*tuổi|sơ sinh|0\s*[-–]\s*(6|12|24)\s*tháng|(\d|1\d|2[0-3])\s*tháng tuổi|"
              r"giai đoạn\s*1|trẻ nhỏ dưới 2)")
 MEDICAL = r"(chữa\s+\w+|điều trị|đặc trị|trị\s+(dứt điểm|táo bón|biếng ăn|còi xương)|khỏi bệnh)"

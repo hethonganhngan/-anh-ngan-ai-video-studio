@@ -7,18 +7,16 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
 
-from sqlalchemy import func, select
-
 from app.agents.models import AgentConfig, AgentExecution
 from app.core.context import Ctx
 from app.core.errors import AppError, Forbidden, NotFound
 from app.core.independent import persist
-from app.modules.administration.models import AuditLog
 from app.core.security import decrypt_secret
 from app.modules.administration import service as admin
-from app.modules.administration.models import ProviderAccount
+from app.modules.administration.models import AuditLog, ProviderAccount
 from app.providers.llm.base import LLMError, LLMProvider, LLMResult
 from app.providers.llm.mock import MockLLMProvider
+from sqlalchemy import func, select
 
 log = logging.getLogger("anngan.agents")
 
@@ -147,6 +145,7 @@ def _finish(exe: AgentExecution, status: str, start: float, error: str | None = 
 def sweep_abandoned(db, older_than_minutes: int = 30) -> int:
     """Đánh dấu lần chạy kẹt RUNNING (worker chết / transaction rollback) là FAILED."""
     from datetime import timedelta
+
     from sqlalchemy import update
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)

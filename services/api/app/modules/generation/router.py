@@ -3,9 +3,6 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
-from pydantic import BaseModel
-
 from app.api.deps import require
 from app.api.schemas import ORM, Page
 from app.core.context import Ctx
@@ -15,6 +12,8 @@ from app.media.storage import safe_remove
 from app.modules.generation import service
 from app.modules.scripts.schemas import SceneOut
 from app.providers.video.registry import list_video_providers
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from pydantic import BaseModel
 
 router = APIRouter(tags=["B05 Video Generation Manager"])
 

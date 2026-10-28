@@ -3,11 +3,10 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, Index
+from app.db.base import Base, DataModeMixin, SoftDeleteMixin, TimestampMixin, UUIDMixin, utcnow
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.base import Base, DataModeMixin, SoftDeleteMixin, TimestampMixin, UUIDMixin, utcnow
 
 
 class Channel(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):

@@ -2,16 +2,15 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, UploadFile
-from fastapi.responses import Response
-from pydantic import BaseModel, Field
-
 from app.api.deps import require
 from app.api.schemas import ORM
 from app.core.context import Ctx
 from app.core.errors import ValidationFailed
 from app.modules.analytics import service
 from app.modules.analytics.models import AnalyticsSnapshot
+from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["B11 Analytics Engine"])
 
@@ -72,9 +71,8 @@ def export_csv(channel_id: uuid.UUID | None = None, ctx: Ctx = Depends(require("
 
 @router.get("/publications/{pid}/snapshots", response_model=list[SnapshotOut])
 def snapshots(pid: uuid.UUID, ctx: Ctx = Depends(require("analytics.view"))):
-    from sqlalchemy import select
-
     from app.modules.publishing.service import get_pub
+    from sqlalchemy import select
 
     get_pub(ctx, pid)
     return ctx.db.scalars(select(AnalyticsSnapshot).where(AnalyticsSnapshot.publication_id == pid)
