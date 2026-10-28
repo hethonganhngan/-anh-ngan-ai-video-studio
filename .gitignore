@@ -8,6 +8,7 @@ htmlcov/
 var/
 node_modules/
 .next/
+.next-*/
 apps/web/out/
 apps/web/test-results/
 apps/web/playwright-report/

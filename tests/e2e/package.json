@@ -1,0 +1,6 @@
+{
+  "name": "@anngan/e2e",
+  "private": true,
+  "scripts": { "test": "playwright test", "report": "playwright show-report" },
+  "devDependencies": { "@playwright/test": "1.63.0", "@types/node": "22.18.6", "typescript": "5.9.2" }
+}
