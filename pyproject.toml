@@ -1,0 +1,14 @@
+[tool.pytest.ini_options]
+pythonpath = ["services/api", "services/worker"]
+testpaths = ["tests/unit", "tests/integration"]
+addopts = "--import-mode=importlib -q"
+markers = ["slow: render 1080p thật"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py313"
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+ignore = ["B008", "E731", "B904"]

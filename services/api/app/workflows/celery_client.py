@@ -47,6 +47,13 @@ def enqueue(task_name: str, *args) -> str | None:
     return res.id
 
 
+def enqueue_later(task_name: str, delay_sec: int, *args) -> str | None:
+    """Hẹn giờ (poll nhà cung cấp). Eager: bỏ qua — recover_stuck_jobs sẽ xử lý tác vụ còn treo."""
+    if get_settings().celery_task_always_eager:
+        return None
+    return get_celery().send_task(task_name, args=list(args), countdown=delay_sec).id
+
+
 def worker_status() -> dict:
     s = get_settings()
     if s.celery_task_always_eager:

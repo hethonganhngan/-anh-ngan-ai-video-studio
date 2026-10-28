@@ -38,3 +38,5 @@ def get_db() -> Iterator[Session]:
         yield db
     finally:
         db.close()
+
+import app.workflows.dispatch  # noqa: E402,F401  (đăng ký listener after_commit)
