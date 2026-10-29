@@ -1,27 +1,44 @@
 # Cài đặt & vận hành
 
-## A. Docker Compose (khuyến nghị cho máy chủ cửa hàng / VPS)
+## A. Cài đặt tự động một lệnh (khuyến nghị — Ubuntu 22.04/24.04, Debian 12)
 
-Yêu cầu: Docker Engine 24+ và Docker Compose v2, 4 vCPU, 8 GB RAM, 50 GB đĩa.
-
-```bash
-cp .env.example .env
-```
-Sửa `.env`: `SECRET_KEY`, `ENCRYPTION_KEY`, `POSTGRES_PASSWORD`, `MINIO_ROOT_PASSWORD`, `INITIAL_ADMIN_EMAIL`. Để trống `INITIAL_ADMIN_PASSWORD` để hệ thống tự sinh mật khẩu mạnh. Môi trường thật: `SEED_ARGS=--no-demo-users`, `COOKIE_SECURE=true` khi có HTTPS.
+Yêu cầu máy chủ: 4 vCPU, 8 GB RAM (tối thiểu 4 GB), 50 GB đĩa (tối thiểu 20 GB), quyền root.
 
 ```bash
-docker compose up -d --build
+git clone https://github.com/hethonganhngan/-anh-ngan-ai-video-studio.git anngan-studio
 ```
 ```bash
-docker compose logs migrate
+cd anngan-studio && sudo ADMIN_EMAIL=ceo@anhngan.vn bash scripts/install_server.sh
 ```
-Lệnh trên in **mật khẩu Super Admin khởi tạo (chỉ một lần)** — lưu vào nơi an toàn; hệ thống bắt buộc đổi ở lần đăng nhập đầu. Mở `http://<máy chủ>:8080`.
 
-Dịch vụ: `postgres`, `redis`, `minio` (console `127.0.0.1:9001`), `migrate` (alembic + seed, chạy 1 lần), `api`, `worker` (generation/render), `beat` (khôi phục tác vụ kẹt 5 phút/lần), `web`, `gateway` (Nginx cùng origin). Giám sát: `docker compose --profile monitoring up -d prometheus`.
+Script `scripts/install_server.sh` tự động:
+1. Kiểm tra CPU/RAM/đĩa.
+2. Cài Docker Engine + Compose từ kho chính thức của Docker (nếu chưa có).
+3. Tạo `.env` với khoá bí mật ngẫu nhiên (SECRET_KEY, ENCRYPTION_KEY, mật khẩu DB, mật khẩu Super Admin) — không ghi đè `.env` đã có.
+4. Build image và khởi động 7 dịch vụ: `postgres`, `redis`, `migrate` (alembic + seed, chạy 1 lần), `api`, `worker`, `beat`, `web`, `gateway` (Nginx).
+5. Chờ `/health/ready` đạt, in bảng trạng thái.
+6. Cài lịch sao lưu 2h sáng hằng ngày (`/etc/cron.d/anngan-backup`).
+7. In URL + email + mật khẩu Super Admin (lưu tại `var/ADMIN_CREDENTIALS.txt`, quyền 600 — đổi mật khẩu ngay, rồi xoá file).
 
-HTTPS: đặt Nginx/Caddy/Cloudflare Tunnel phía trước gateway, đặt `COOKIE_SECURE=true`.
+Tuỳ chọn: `HTTP_PORT=8080`, `WITH_DEMO=1` (tài khoản + dữ liệu mẫu DEMO), `SKIP_CRON=1`, `SKIP_BUILD=1` (dùng image đã build sẵn).
 
-> Môi trường build hiện tại không có Docker daemon nên compose mới được kiểm tra cú pháp (`docker compose config`); các thành phần đã chạy thật bằng dịch vụ cục bộ tương đương (PostgreSQL 16, Redis 7, Celery worker, FFmpeg). Lần đầu triển khai Docker hãy chạy kiểm tra ở mục D.
+Lưu trữ media: mặc định trên volume Docker `backend_var` dùng chung giữa API và worker. Dùng S3-compatible (AWS S3, Cloudflare R2, Wasabi): đặt `STORAGE_BACKEND=s3` và `S3_*` trong `.env`. (MinIO đã ngừng phát hành image công khai trên Docker Hub nên không còn đi kèm.)
+
+HTTPS: đặt Nginx/Caddy/Cloudflare Tunnel phía trước cổng gateway, đặt `COOKIE_SECURE=true`.
+Giám sát: `docker compose --profile monitoring up -d prometheus`.
+
+Lệnh vận hành thường dùng:
+```bash
+docker compose ps
+```
+```bash
+docker compose logs -f api worker
+```
+```bash
+git pull && docker compose up -d --build
+```
+
+> **Kết quả kiểm chứng (2026-10-29):** chạy `install_server.sh` trên bản clone sạch: 7 dịch vụ healthy, `/health/ready` ok, đăng nhập qua gateway, tạo video → worker Celery trong container render MP4 1080×1920 trong 15 giây, tải video qua gateway, backup pg_dump trong container. Image **web** build từ Dockerfile thật. Image **backend** trong môi trường kiểm thử phải dựng trên nền Ubuntu vì mạng kiểm thử chặn kho gói Debian (`deb.debian.org`); trên máy chủ thật dùng nguyên `api.Dockerfile` (nền python:3.13-slim) — lần build đầu trên máy chủ thật là bước cần quan sát.
 
 ## B. Chạy phát triển (không Docker)
 

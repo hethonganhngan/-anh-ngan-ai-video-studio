@@ -13,7 +13,7 @@
             ┌──────────────┬─────────────────────┼──────────────────┬───────────────────┐
             ▼              ▼                     ▼                  ▼                   ▼
       PostgreSQL 16     Redis 7          Celery worker(s)      Celery beat      Object Storage
-      45 bảng, trigger  broker + rate    generation / render   recover 5 phút   MinIO/S3 (local dev)
+      45 bảng, trigger  broker + rate    generation / render   recover 5 phút   Volume / S3 (tuỳ chọn)
       bất biến          limit            FFmpeg + FFprobe
                                                  │
                          ┌───────────────────────┼─────────────────────────┐

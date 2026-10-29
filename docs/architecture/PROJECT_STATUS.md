@@ -1,6 +1,6 @@
 # PROJECT STATUS — Ánh Ngân AI Video Studio V2.0
 
-**Cập nhật:** 2026-10-29 · **Giai đoạn hiện tại:** 6 — Verification ✅ hoàn tất · **Nhánh:** `main`
+**Cập nhật:** 2026-10-29 · **Giai đoạn hiện tại:** 6 — Verification ✅ hoàn tất · Triển khai Docker tự động ✅ · **Nhánh:** `main`
 
 ## Chức năng hoàn thành
 - 15 màn hình (M01–M15) + trang chi tiết dự án, chi tiết Feedback, tài khoản; sidebar 5 nhóm; trạng thái loading/empty/error/success/không có quyền.
@@ -11,7 +11,7 @@
 - QC 10 tiêu chí, phê duyệt; Feedback Loop 360° 8 bước + REOPENED; Lessons Learned áp dụng/rollback prompt.
 - Publishing (lịch, gói xuất file, URL, chặn DEMO tự đăng), Analytics (thủ công, CSV, insights, export), Dashboard CEO 14 KPI có công thức.
 - RBAC 8 vai trò × 55 quyền, CSRF, khoá tài khoản, rate limit, mã hoá secret, audit log, ngân sách + chặn cứng, backup/restore, DEMO/PRODUCTION tách dữ liệu.
-- Celery worker + beat (khôi phục tác vụ kẹt), Docker Compose (Postgres, Redis, MinIO, API, worker, beat, web, Nginx, Prometheus), tài liệu đầy đủ, seed dữ liệu mẫu DEMO.
+- Celery worker + beat (khôi phục tác vụ kẹt), Docker Compose (Postgres, Redis, API, worker, beat, web, Nginx, Prometheus) + script cài đặt tự động `scripts/install_server.sh` (đã chạy thật: 7 dịch vụ healthy), tài liệu đầy đủ, seed dữ liệu mẫu DEMO.
 
 ## Kiểm thử (lần chạy cuối 2026-10-29)
 | Bộ | Kết quả |
@@ -22,7 +22,7 @@
 | Playwright E2E (16 file, 15 màn hình + đăng nhập/shell) | ✅ **31/31** (3,0 phút) |
 | npm audit (web, production deps) | ✅ 0 lỗ hổng |
 | Celery worker thật (Redis, không eager) | ✅ kiểm chứng thủ công: worker lỗi → `/jobs/recover` → tạo cảnh + render → FINAL_QC |
-| Docker | ⚠️ `docker compose config` hợp lệ; **chưa chạy** vì môi trường build không có Docker daemon |
+| Docker | ✅ Cài tự động + chạy thật: 7 dịch vụ healthy, tạo video 1080p qua worker trong container, backup (image backend kiểm thử trên nền Ubuntu do mạng kiểm thử chặn kho Debian) |
 
 ## Lỗi đã phát hiện & đã sửa trong giai đoạn kiểm thử
 1. Tạo cảnh khi dự án NEEDS_MANUAL_ACTION bỏ qua kiểm tra tài nguyên → chặn (`ASSET_VALIDATION_REQUIRED`).
@@ -35,7 +35,7 @@
 
 ## Chưa hoàn thành / giới hạn đã biết
 - Chưa kết nối thật: Claude, Veo/Vertex AI, TTS, Facebook/TikTok/YouTube/Zalo (cần quyền API). Xem `docs/deployment/INTEGRATIONS.md`.
-- S3/MinIO adapter chưa chạy với MinIO thật; Docker chưa chạy thật.
+- S3 adapter chưa chạy với S3 thật (mặc định dùng volume). Build `api.Dockerfile` nền Debian cần quan sát lần đầu trên máy chủ thật.
 - Timeline M06 sắp xếp bằng nút lên/xuống (chưa kéo-thả đa track); chưa có lip-sync tự động (tiêu chí Khẩu hình chấm thủ công).
 - Chưa có CSP header cho web; chưa có thông báo Email/Zalo.
 
@@ -43,7 +43,7 @@
 Xem `git log --oneline -5`.
 
 ## Công việc tiếp theo (đề xuất)
-1. Chạy `docker compose up -d --build` trên máy chủ thật và đi checklist mục D trong INSTALL.md.
+1. Trên máy chủ thật: `sudo bash scripts/install_server.sh` rồi đi checklist mục D trong INSTALL.md.
 2. Cấp key Anthropic → Test ở PRODUCTION → chuyển A02/A08/A09 sang Claude, đặt budget PROVIDER.
 3. Xin quyền API Veo (Vertex AI) và cấu hình RealAPIProvider; nghiệm thu với ngân sách nhỏ.
 4. Đào tạo người dùng theo `docs/user-guide/HUONG_DAN_SU_DUNG.md`; thay tài khoản DEMO bằng tài khoản thật.

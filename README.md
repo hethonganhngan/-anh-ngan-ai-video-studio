@@ -14,14 +14,11 @@ Nhà máy sản xuất video AI của **Hệ thống Sữa Ánh Ngân** — ki�
 
 ## Bắt đầu nhanh
 
-Docker (máy chủ):
+Máy chủ Ubuntu/Debian — cài tự động một lệnh (Docker, khoá bí mật, build, kiểm tra sức khoẻ, lịch backup):
 ```bash
-cp .env.example .env
+sudo bash scripts/install_server.sh
 ```
-```bash
-docker compose up -d --build
-```
-Mở http://localhost:8080 — mật khẩu Super Admin khởi tạo in trong `docker compose logs migrate`.
+Mở http://<máy chủ>:8080 — tài khoản Super Admin in ra cuối quá trình cài (lưu tại `var/ADMIN_CREDENTIALS.txt`).
 
 Phát triển (không Docker) — xem [docs/deployment/INSTALL.md](docs/deployment/INSTALL.md):
 ```bash
@@ -38,7 +35,7 @@ scripts/run_tests.sh
 
 ## Công nghệ
 
-Next.js 15 · TypeScript · Tailwind 4 · shadcn/ui (Radix) · TanStack Query · React Hook Form · Zod · Recharts — FastAPI · SQLAlchemy 2 · Alembic · Pydantic 2 · PostgreSQL 16 · Redis 7 · Celery 5 — FFmpeg/FFprobe — Docker Compose · Nginx · MinIO (S3) · Prometheus — pytest · Playwright.
+Next.js 15 · TypeScript · Tailwind 4 · shadcn/ui (Radix) · TanStack Query · React Hook Form · Zod · Recharts — FastAPI · SQLAlchemy 2 · Alembic · Pydantic 2 · PostgreSQL 16 · Redis 7 · Celery 5 — FFmpeg/FFprobe — Docker Compose · Nginx · S3 (tuỳ chọn) · Prometheus — pytest · Playwright.
 
 ## Tài liệu
 
