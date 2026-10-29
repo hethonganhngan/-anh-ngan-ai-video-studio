@@ -4,7 +4,7 @@
 #  Dùng:  sudo bash scripts/install_server.sh            (chạy trong thư mục repo đã clone)
 #  Tuỳ chọn biến môi trường:
 #    ADMIN_EMAIL=ceo@anhngan.vn  HTTP_PORT=8080  WITH_DEMO=1 (tạo user + dữ liệu DEMO)
-#    SKIP_CRON=1 (không cài lịch sao lưu hằng ngày)
+#    SKIP_CRON=1 (không cài lịch sao lưu hằng ngày)  SKIP_BUILD=1 (dùng image anngan/* đã có sẵn)
 #  Script: cài Docker (nếu chưa có) → tạo .env với khoá ngẫu nhiên → build & chạy → kiểm tra sức khoẻ
 #  → in mật khẩu Super Admin khởi tạo (chỉ hiện 1 lần, lưu tại var/ADMIN_CREDENTIALS.txt quyền 600).
 # =====================================================================
@@ -83,9 +83,14 @@ else
 fi
 
 # 4. Build & chạy
-log "Build image và khởi động (lần đầu 5–15 phút)"
-docker compose build
-docker compose up -d
+if [ "${SKIP_BUILD:-0}" = "1" ]; then
+  log "Dùng image đã build sẵn (SKIP_BUILD=1) và khởi động"
+  docker compose up -d --no-build
+else
+  log "Build image và khởi động (lần đầu 5–15 phút)"
+  docker compose build
+  docker compose up -d
+fi
 
 # 5. Chờ sẵn sàng
 log "Chờ hệ thống sẵn sàng"
