@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Download, Music, PlayCircle, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Mic, Music, PlayCircle, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, assetUrl, errorMessage } from "@/lib/api";
 import { PageHeader } from "@/components/app/page-header";
@@ -77,6 +77,18 @@ function Editor({ project }: { project: Project }) {
     try { await api(`/projects/${pid}/render`, { method: "POST" }); toast.success("Đã gửi render MP4"); invalidate(); }
     catch (e) { toast.error(errorMessage(e)); } finally { setBusy(null); }
   };
+  const genVoiceover = async () => {
+    if (dirty && !(await save())) return;
+    setBusy("tts");
+    try {
+      const r = await api<{ timeline: Timeline; duration_sec: number; cost_vnd: number; simulated: boolean; warnings: string[] }>(
+        `/projects/${pid}/voiceover/generate`, { method: "POST", body: {} });
+      setTl(normalize(r.timeline)); setDirty(false);
+      toast.success(`Đã tạo giọng đọc ${r.duration_sec.toFixed(1)}s${r.simulated ? " (DEMO — tiếng bíp mô phỏng)" : ` · ${r.cost_vnd.toLocaleString("vi-VN")} đ`}`);
+      r.warnings.forEach((w) => toast.warning(w));
+      invalidate(); qc.invalidateQueries({ queryKey: ["assets", "AUDIO"] });
+    } catch (e) { toast.error(errorMessage(e)); } finally { setBusy(null); }
+  };
   const audioOpts = audios.data?.items ?? [];
   const logoOpts = logos.data?.items ?? [];
 
@@ -138,10 +150,14 @@ function Editor({ project }: { project: Project }) {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Music className="h-4 w-4" />Audio tracks</CardTitle><CardDescription>Voice-over (file thu âm có consent) và nhạc nền. Âm thanh được chuẩn hoá loudness khi render.</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Music className="h-4 w-4" />Audio tracks</CardTitle><CardDescription>Voice-over (giọng AI hoặc file thu âm có consent) và nhạc nền. Âm thanh được chuẩn hoá loudness khi render.</CardDescription></CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2" data-testid="voiceovers">
-                <p className="text-sm font-medium">Voice-over</p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Voice-over</p>
+                  {canEdit && <Button size="sm" onClick={genVoiceover} loading={busy === "tts"} data-testid="generate-voiceover"><Mic />Tạo giọng đọc AI</Button>}
+                </div>
+                {canEdit && <p className="text-[11px] text-slate-500">Đọc lời thoại các cảnh bằng Voice Profile của dự án, đặt đúng mốc từng cảnh và giảm âm lượng cảnh còn 35%. Tạo lại sẽ thay bản cũ.</p>}
                 {tl.voiceover.map((v, i) => (
                   <div key={i} className="grid items-end gap-2 md:grid-cols-[1fr_100px_100px_auto]">
                     <NativeSelect disabled={!canEdit} value={v.asset_id} onChange={(e) => update((t) => ({ ...t, voiceover: t.voiceover.map((x, j) => (j === i ? { ...x, asset_id: e.target.value } : x)) }))} data-testid={`vo-asset-${i}`}>

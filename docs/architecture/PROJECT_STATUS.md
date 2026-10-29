@@ -34,7 +34,8 @@
 7. Dashboard lọc kỳ + ngày theo giờ Việt Nam; xoá API key nhà cung cấp; chặn rò rỉ API key tới host lạ; production từ chối khoá mặc định.
 
 ## Chưa hoàn thành / giới hạn đã biết
-- Chưa kết nối thật: Claude, Veo/Vertex AI, TTS, Facebook/TikTok/YouTube/Zalo (cần quyền API). Xem `docs/deployment/INTEGRATIONS.md`.
+- Adapter mới (2026-10-29, chưa xác minh bằng key thật): Gemini Omni Flash (video), Gemini TTS (voice-over M06). Chạy thực tế trên Windows không Docker: `docs/deployment/WINDOWS.md` (pytest 95/95 trên Windows).
+- Chưa kết nối thật: Claude, Gemini Omni, Gemini TTS, Veo/Vertex AI, Facebook/TikTok/YouTube/Zalo (cần quyền API). Xem `docs/deployment/INTEGRATIONS.md`.
 - S3 adapter chưa chạy với S3 thật (mặc định dùng volume). Build `api.Dockerfile` nền Debian cần quan sát lần đầu trên máy chủ thật.
 - Timeline M06 sắp xếp bằng nút lên/xuống (chưa kéo-thả đa track); chưa có lip-sync tự động (tiêu chí Khẩu hình chấm thủ công).
 - Chưa có CSP header cho web; chưa có thông báo Email/Zalo.

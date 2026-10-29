@@ -50,6 +50,7 @@ Next.js 15 · TypeScript · Tailwind 4 · shadcn/ui (Radix) · TanStack Query ·
 | API (159 endpoint) | [docs/api/ENDPOINTS.md](docs/api/ENDPOINTS.md), `docs/api/openapi.json`, `/docs` |
 | Cơ sở dữ liệu (45 bảng) | [docs/database/ERD.md](docs/database/ERD.md) |
 | Cài đặt & vận hành | [docs/deployment/INSTALL.md](docs/deployment/INSTALL.md) |
+| Chạy trên Windows (không Docker) | [docs/deployment/WINDOWS.md](docs/deployment/WINDOWS.md) |
 | Tích hợp thật / chưa kết nối | [docs/deployment/INTEGRATIONS.md](docs/deployment/INTEGRATIONS.md) |
 | Bảo trì & mở rộng | [docs/deployment/MAINTENANCE.md](docs/deployment/MAINTENANCE.md) |
 | Hướng dẫn sử dụng | [docs/user-guide/HUONG_DAN_SU_DUNG.md](docs/user-guide/HUONG_DAN_SU_DUNG.md) |

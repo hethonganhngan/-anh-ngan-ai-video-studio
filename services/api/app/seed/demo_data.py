@@ -9,9 +9,11 @@ from pathlib import Path
 
 from app.core.config import get_settings
 from app.modules.administration.service import get_mode
+from app.modules.rendering.ffmpeg import filter_path
 from sqlalchemy.orm import Session
 
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FONT = _BOLD if os.path.exists(_BOLD) else get_settings().font_file
 
 
 def _ffmpeg(args: list[str]) -> None:
@@ -23,7 +25,7 @@ def _png(d: Path, name: str, color: str, text: str, size: str = "720x960") -> Pa
     tf = d / f"{name}.txt"
     tf.write_text(text, encoding="utf-8")
     _ffmpeg(["-f", "lavfi", "-i", f"color=c={color}:s={size}", "-vf",
-             f"drawtext=fontfile={FONT}:textfile={tf}:fontcolor=white:fontsize=40:x=(w-tw)/2:y=(h-th)/2", "-frames:v", "1", str(p)])
+             f"drawtext=fontfile={filter_path(FONT)}:textfile={filter_path(tf)}:fontcolor=white:fontsize=40:x=(w-tw)/2:y=(h-th)/2", "-frames:v", "1", str(p)])
     return p
 
 
