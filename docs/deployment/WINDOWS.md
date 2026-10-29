@@ -47,32 +47,34 @@ schtasks /Create /TN "AnhNganStudio-Backup" /SC DAILY /ST 02:00 /TR "powershell 
 ```
 Nên chép định kỳ thư mục `D:\AnhNganStudio\backups` sang ổ/máy khác (Google Drive, ổ cứng ngoài).
 
-## 3. Lấy API key (2 key cho 3 dịch vụ)
+## 3. Lấy API key — chỉ 1 key Gemini cho toàn bộ AI
 
-| Dịch vụ | Key | Nơi lấy | Chi phí tham khảo |
+| Dịch vụ | Kết nối ở M15 | Model mặc định | Chi phí tham khảo (bảng giá trả phí) |
 |---|---|---|---|
-| Claude — kịch bản, RCA, bài học (A02/A08/A09) | Anthropic API key | console.anthropic.com → Settings → API Keys (nạp credit trước) | Opus 5.5: 4 USD / 20 USD mỗi 1M token vào/ra |
-| Gemini Omni Flash — tạo video AI | Gemini API key | aistudio.google.com → Get API key → bật Billing cho project | ~0,10 USD/giây video 720p (không có gói miễn phí) |
-| Gemini TTS — giọng đọc tiếng Việt | **cùng key Gemini** | như trên | ~0,00045 USD/giây âm thanh (≈12 đ) |
+| Kịch bản, RCA, bài học (A02/A08/A09) | `gemini_llm` | `gemini-3.8-flash` (đổi tại M14: `gemini-4-argon` mạnh nhất, `gemini-3.5-flash-lite` rẻ nhất) | 3.8 Flash: 1,50 USD vào / 7,50 USD ra mỗi 1M token (giá từ 01/2027; trước đó bằng nửa) — ~1.000–2.000 đ/kịch bản |
+| Tạo video AI | `gemini_omni` | `gemini-omni-1.1-flash` | ~0,10 USD/giây video 720p (không có gói miễn phí) |
+| Giọng đọc tiếng Việt | `gemini_tts` | `gemini-3.8-flash-tts` | ~12 đ/giây âm thanh |
 
-> Veo 3.1 Preview trên Gemini API đã ngừng ngày 22/10/2026 — Google thay bằng Gemini Omni Flash (`gemini-omni-1.1-flash`).
+Lấy key: **aistudio.google.com → Get API key → Create API key**, rồi bật **Billing** cho Google Cloud project của key (bắt buộc cho video).
+Gemini 3.8 Flash và TTS có gói miễn phí (dữ liệu gói miễn phí có thể được Google dùng để cải thiện sản phẩm — dùng gói trả phí cho dữ liệu kinh doanh).
+
+> Veo 3.1 Preview trên Gemini API đã ngừng ngày 22/10/2026 — Google thay bằng Gemini Omni Flash.
 > Omni chỉ cam kết tiếng Anh, nên mặc định video **không có thoại** (chỉ âm thanh môi trường) và thoại tiếng Việt do Gemini TTS đọc.
+> Adapter Anthropic Claude vẫn còn trong mã (provider `anthropic` ở M14) nếu sau này cần; mặc định không dùng.
 
 **Không gửi key qua chat/email.** Chỉ dán key vào ứng dụng ở M15 — key được mã hoá (Fernet) và chỉ hiện 4 ký tự cuối.
 
 ## 4. Bật chạy thật (PRODUCTION)
 
-1. Đăng nhập Super Admin → **M15 Cài đặt → API Connections**:
-   - `Anthropic Claude`: dán key → Lưu → bật → **Test** (phải ra VERIFIED; chỉ Test được ở PRODUCTION MODE).
-   - `Google Gemini Omni Flash`: dán key Gemini → Lưu → bật → **Test** (đọc thông tin model, không tốn phí).
-   - `Google Gemini TTS`: dán cùng key Gemini → Lưu → bật → **Test**.
+1. Đăng nhập Super Admin → **M15 Cài đặt → API Connections**, dán **cùng một key Gemini** vào 3 kết nối, mỗi kết nối: Lưu → bật → **Test** (đọc thông tin model, không tốn phí, phải ra VERIFIED):
+   `Google Gemini — kịch bản & phân tích`, `Google Gemini Omni Flash — tạo video AI`, `Google Gemini TTS — giọng đọc tiếng Việt`.
 2. **M15 → Budget**: đặt hạn mức tháng PRODUCTION (mặc định 10.000.000 đ, chặn cứng) và hạn mức theo nhà cung cấp `gemini_omni`.
 3. **M15 → chuyển PRODUCTION MODE.** DEMO MODE không bao giờ gọi API tính phí.
-4. **M14 Agent Control Center**: đổi A02 (kịch bản), A08, A09 sang provider `anthropic`, model `claude-opus-5-5`.
+4. **M14 Agent Control Center**: A02, A08, A09 đã đặt sẵn provider `gemini` / `gemini-3.8-flash` — kiểm tra lại, đổi model nếu muốn.
 5. **M04 → Giọng nói mới**: Provider = *Gemini TTS*, chọn giọng (Kore, Aoede, Leda… — nghe thử tại AI Studio), Accent/Chất giọng/Tốc độ dùng làm hướng dẫn đọc, Consent = *Đã đồng ý* (giọng AI dựng sẵn), ghi phạm vi sử dụng. (Voice Lock cần file audio tham chiếu — với giọng AI có thể bỏ qua, hệ thống chỉ cảnh báo.)
 6. **M02 Tạo video**: chọn kênh và Voice Profile vừa tạo; khi tạo cảnh chọn nhà cung cấp video *Google Gemini Omni Flash*.
 7. **M06 Editor → Tạo giọng đọc AI** → kiểm tra → **Export MP4** → M07 QC.
-8. Thử 1 video 16 giây trước (~1,6 USD video + vài trăm đồng giọng đọc) rồi mới chạy hàng loạt.
+8. Thử 1 video 16 giây trước (~42.000 đ video + ~2.000 đ kịch bản + vài trăm đồng giọng đọc) rồi mới chạy hàng loạt.
 9. Tắt/xoá tài khoản DEMO (`@anhngan.local`) ở M15 trước khi giao cho nhân viên; tạo tài khoản thật theo vai trò.
 
 ## 5. Khắc phục sự cố

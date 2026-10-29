@@ -51,7 +51,7 @@ def resolve_llm(ctx: Ctx, cfg: AgentConfig) -> LLMProvider:
     """DEMO → luôn Mock. PRODUCTION → provider đã cấu hình và có key; nếu không → LLMNotConnected."""
     if ctx.mode == "DEMO" or cfg.provider_code in ("mock-llm",):
         if ctx.mode == "PRODUCTION":
-            raise LLMNotConnected(f"{cfg.name}: chưa cấu hình LLM thật cho PRODUCTION. Hãy thao tác thủ công hoặc kết nối Anthropic ở M15.")
+            raise LLMNotConnected(f"{cfg.name}: chưa cấu hình LLM thật cho PRODUCTION. Hãy thao tác thủ công, hoặc kết nối Gemini/Anthropic ở M15 rồi chọn provider tại M14.")
         return MockLLMProvider()
     if cfg.provider_code == "anthropic":
         acc = ctx.db.scalar(select(ProviderAccount).where(ProviderAccount.provider_code == "anthropic"))
@@ -61,6 +61,14 @@ def resolve_llm(ctx: Ctx, cfg: AgentConfig) -> LLMProvider:
         from app.providers.llm.anthropic_provider import AnthropicProvider
 
         return AnthropicProvider(api_key=key, model=cfg.model)
+    if cfg.provider_code == "gemini":
+        acc = ctx.db.scalar(select(ProviderAccount).where(ProviderAccount.provider_code == "gemini_llm"))
+        key = decrypt_secret(acc.secret_encrypted) if acc and acc.is_enabled and acc.secret_encrypted else None
+        if not key:
+            raise LLMNotConnected("Gemini (LLM) chưa được kết nối/bật ở M15 → API Connections")
+        from app.providers.llm.gemini_provider import GeminiLLMProvider
+
+        return GeminiLLMProvider(api_key=key, model=cfg.model, config=acc.config)
     raise LLMNotConnected(f"Provider LLM '{cfg.provider_code}' không được hỗ trợ")
 
 

@@ -10,7 +10,7 @@ import sys
 from decimal import Decimal
 
 from app.agents.models import AgentConfig
-from app.agents.registry import AGENTS, MOCK_LLM, RULE_ENGINE
+from app.agents.registry import AGENTS, DEFAULT_LLM, RULE_ENGINE
 from app.core.config import get_settings
 from app.core.permissions import PERMISSIONS, ROLES
 from app.core.security import generate_password, hash_password
@@ -89,7 +89,7 @@ def seed_channels(db: Session) -> None:
 def seed_agents(db: Session) -> None:
     for code, spec in AGENTS.items():
         cfg = db.get(AgentConfig, code)
-        provider, model = MOCK_LLM if spec["uses_llm"] else RULE_ENGINE
+        provider, model = DEFAULT_LLM if spec["uses_llm"] else RULE_ENGINE
         if cfg is None:
             cfg = AgentConfig(code=code, name=spec["name"], role_description=spec["role"], provider_code=provider,
                               model=model, allowed_actions=spec["allowed_actions"],

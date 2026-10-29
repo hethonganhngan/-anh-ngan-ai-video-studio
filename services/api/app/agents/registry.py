@@ -3,6 +3,7 @@ Không Agent nào có quyền phê duyệt, xuất bản hay sửa cấu hình c
 
 RULE_ENGINE = ("internal", "rule-engine-v1")
 MOCK_LLM = ("mock-llm", "mock-deterministic-v1")
+DEFAULT_LLM = ("gemini", "gemini-3.8-flash")  # DEMO vẫn luôn chạy Mock (resolve_llm)
 
 AGENTS: dict[str, dict] = {
     "A01": {"name": "AI Director", "uses_llm": False,

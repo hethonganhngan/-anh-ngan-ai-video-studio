@@ -15,7 +15,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 router = APIRouter(prefix="/agents", tags=["M14 AI Agent Control Center"])
-LLM_PROVIDERS = {"mock-llm": ["mock-deterministic-v1"], "anthropic": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]}
+LLM_PROVIDERS = {"mock-llm": ["mock-deterministic-v1"], "anthropic": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+                 "gemini": ["gemini-3.8-flash", "gemini-4-argon", "gemini-3.5-flash-lite"]}
 
 
 class ExecOut(ORM):
