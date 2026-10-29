@@ -19,6 +19,16 @@ NO_SPEECH = ("Không có lời thoại, không có người nói, không có ch�
              "No spoken dialogue, no narration, no on-screen text; ambient sound only.")
 
 
+def interaction_error(data: dict) -> tuple[str | None, str | None]:
+    """Lỗi của interaction: mảng `errors` [{code, message}] (hoặc `error` đơn lẻ)."""
+    errs = data.get("errors") or ([data["error"]] if data.get("error") else [])
+    for e in errs:
+        if isinstance(e, dict):
+            return e.get("code"), e.get("message")
+        return None, str(e)
+    return None, None
+
+
 def _err(e: GeminiError) -> ProviderError:
     return ProviderError(str(e), code=e.code, retryable=e.retryable)
 
@@ -121,9 +131,13 @@ class GeminiOmniProvider(VideoProvider):
         if st == "completed":
             return ProviderStatus(state="SUCCEEDED", progress=100)
         if st in ("failed", "cancelled"):
-            msg = (data.get("error") or {}).get("message") if isinstance(data.get("error"), dict) else data.get("error")
-            return ProviderStatus(state="FAILED" if st == "failed" else "CANCELLED", error_code="PROVIDER_FAILED",
-                                  error_message=str(msg or f"Gemini báo {st}")[:500])
+            code, msg = interaction_error(data)
+            if code == "RESOURCE_EXHAUSTED":  # hết hạn mức / chưa bật Billing — thử lại vô ích
+                return ProviderStatus(state="NEEDS_MANUAL_ACTION", error_code="QUOTA_EXHAUSTED",
+                                      error_message="Gemini hết hạn mức (RESOURCE_EXHAUSTED): bật Billing cho Google Cloud project "
+                                                    "của key (video không có gói miễn phí) hoặc chờ hạn mức phục hồi, rồi tạo lại cảnh.")
+            return ProviderStatus(state="FAILED" if st == "failed" else "CANCELLED", error_code=code or "PROVIDER_FAILED",
+                                  error_message=(msg or f"Gemini báo {st}")[:500])
         if st == "requires_action":
             return ProviderStatus(state="NEEDS_MANUAL_ACTION", error_message="Gemini yêu cầu thao tác bổ sung")
         return ProviderStatus(state="RUNNING", progress=50)

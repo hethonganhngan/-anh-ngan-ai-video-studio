@@ -66,7 +66,12 @@ class GeminiLLMProvider(LLMProvider):
             raise _err(e)
         status = data.get("status")
         if status in ("failed", "cancelled"):
-            raise LLMError(f"Gemini báo {status}: {data.get('error')}", code="PROVIDER_ERROR", retryable=status == "failed")
+            from app.providers.video.gemini_omni import interaction_error
+
+            code, msg = interaction_error(data)
+            if code == "RESOURCE_EXHAUSTED":
+                raise LLMError("Gemini hết hạn mức (RESOURCE_EXHAUSTED) — kiểm tra Billing/hạn mức của key", code="RATE_LIMITED")
+            raise LLMError(f"Gemini báo {status}: {code or ''} {msg or ''}".strip(), code="PROVIDER_ERROR", retryable=status == "failed")
         text = "".join(item.get("text", "") for step in data.get("steps") or [] if step.get("type") == "model_output"
                        for item in step.get("content") or [] if isinstance(item, dict) and item.get("type") == "text")
         if not text.strip():
