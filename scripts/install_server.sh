@@ -4,6 +4,7 @@
 #  Dùng:  sudo bash scripts/install_server.sh            (chạy trong thư mục repo đã clone)
 #  Tuỳ chọn biến môi trường:
 #    ADMIN_EMAIL=ceo@anhngan.vn  HTTP_PORT=8080  WITH_DEMO=1 (tạo user + dữ liệu DEMO)
+#    SKIP_CRON=1 (không cài lịch sao lưu hằng ngày)
 #  Script: cài Docker (nếu chưa có) → tạo .env với khoá ngẫu nhiên → build & chạy → kiểm tra sức khoẻ
 #  → in mật khẩu Super Admin khởi tạo (chỉ hiện 1 lần, lưu tại var/ADMIN_CREDENTIALS.txt quyền 600).
 # =====================================================================
@@ -97,10 +98,14 @@ docker compose ps --format 'table {{.Service}}\t{{.State}}\t{{.Status}}'
 curl -s "http://localhost:${HTTP_PORT}/health/ready"; echo
 
 # 6. Sao lưu tự động hằng ngày 2h sáng (pg_dump trong container api, giữ 14 bản)
+if [ "${SKIP_CRON:-0}" = "1" ]; then
+  log "Bỏ qua cài lịch sao lưu (SKIP_CRON=1)"
+else
 log "Cài lịch sao lưu hằng ngày"
 cat > /etc/cron.d/anngan-backup <<CRON
 0 2 * * * root cd ${ROOT} && docker compose exec -T api python -c "from app.modules.administration.backup import create_backup; print(create_backup())" >> /var/log/anngan-backup.log 2>&1
 CRON
+fi
 
 log "HOÀN TẤT"
 echo "Mở: http://<địa-chỉ-máy-chủ>:${HTTP_PORT}"
