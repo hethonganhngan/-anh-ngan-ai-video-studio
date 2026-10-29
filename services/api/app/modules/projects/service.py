@@ -11,7 +11,7 @@ from app.modules.administration.models import User
 from app.modules.administration.service import get_setting
 from app.modules.projects.models import Channel, ProductionBatch, Project, WorkflowEvent
 from app.modules.projects.schemas import ProjectCreate, ProjectUpdate
-from app.providers.video.registry import get_video_provider
+from app.providers.video.registry import get_video_provider, list_video_providers
 from app.workflows import state_machine as sm
 from sqlalchemy import func, or_, select
 
@@ -178,6 +178,29 @@ def kanban(ctx: Ctx, channel_id=None) -> dict:
     return {"columns": [{"name": n, "statuses": columns[n], "items": out[n]} for n in columns]}
 
 
+def _switch_video_provider(ctx: Ctx, p: Project, code: str) -> None:
+    """Đổi nhà cung cấp video: chặn khi còn tác vụ đang chạy; huỷ các tác vụ đang chờ thủ công của provider cũ."""
+    from app.modules.generation.models import GenerationJob
+    from app.modules.scripts.models import Scene
+
+    provider = get_video_provider(ctx.db, code, ctx.mode)
+    info = next((x for x in list_video_providers(ctx.db, ctx.mode) if x["code"] == code), None)
+    if info is None or not info["available"]:
+        raise ValidationFailed(f"Nhà cung cấp {provider.name} chưa sẵn sàng — nhập API key & bật ở M15", code="PROVIDER_NOT_READY")
+    running = ctx.db.scalar(select(GenerationJob.id).where(
+        GenerationJob.project_id == p.id, GenerationJob.status.in_(["QUEUED", "SUBMITTED", "RUNNING", "RETRY_PENDING"])).limit(1))
+    if running is not None:
+        raise ValidationFailed("Đang có cảnh được tạo — chờ xong hoặc huỷ tác vụ rồi mới đổi nhà cung cấp", code="JOBS_RUNNING")
+    waiting = list(ctx.db.scalars(select(GenerationJob).where(
+        GenerationJob.project_id == p.id, GenerationJob.status == "NEEDS_MANUAL_ACTION")))
+    for job in waiting:
+        job.status = "CANCELLED"
+        job.log = [*(job.log or []), {"msg": f"Huỷ do đổi nhà cung cấp sang {provider.name}"}]
+        scene = ctx.db.get(Scene, job.scene_id)
+        if scene is not None and scene.status not in ("GENERATED", "QC_PASSED"):
+            scene.status = "PROMPT_READY"
+
+
 def update_project(ctx: Ctx, project_id, data: ProjectUpdate) -> Project:
     ctx.require("project.edit")
     p = lock_project(ctx, project_id)
@@ -186,8 +209,10 @@ def update_project(ctx: Ctx, project_id, data: ProjectUpdate) -> Project:
     changes = data.model_dump(exclude_unset=True)
     if changes.get("automation_level") and changes["automation_level"] not in {"MANUAL", "ASSISTED", "AUTO"}:
         raise ValidationFailed("Mức tự động hoá không hợp lệ")
-    if "video_provider_code" in changes:
-        get_video_provider(ctx.db, changes["video_provider_code"], ctx.mode)
+    if "video_provider_code" in changes and changes["video_provider_code"] != p.video_provider_code:
+        _switch_video_provider(ctx, p, changes["video_provider_code"])
+    elif "video_provider_code" in changes:
+        changes.pop("video_provider_code")
     _validate_refs(ctx, data)
     before = {k: getattr(p, k) for k in changes}
     for k, v in changes.items():

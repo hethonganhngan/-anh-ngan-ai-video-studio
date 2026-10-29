@@ -237,3 +237,30 @@ def test_concurrent_duplicate_requests_return_same_project(login, channels):
     [t.join() for t in ts]
     assert all(r.status_code == 201 for r in out), [r.text for r in out]
     assert len({r.json()["projects"][0]["id"] for r in out}) == 1
+
+
+def test_switch_manual_flow_to_auto_provider(login, channels):
+    pm = login("pm")
+    p = create_project(pm, channels["ANNGAN"]["id"], topic="Chuyển từ Flow sang tạo tự động", duration_sec=16,
+                       automation_level="MANUAL", video_provider_code="manual_flow")
+    pid = p["id"]
+    pm.post(f"/projects/{pid}/script/ideas")
+    pm.post(f"/projects/{pid}/script/select-idea", json={"index": 0})
+    pm.post(f"/projects/{pid}/script/write")
+    pm.post(f"/projects/{pid}/script/approve", json={})
+    pm.post(f"/projects/{pid}/validate-assets")
+    pm.post(f"/projects/{pid}/generate", json={})
+    assert pm.get(f"/projects/{pid}").json()["status"] == "NEEDS_MANUAL_ACTION"
+
+    # Provider chưa kết nối bị chặn
+    r = pm.patch(f"/projects/{pid}", json={"video_provider_code": "veo_vertex"})
+    assert r.status_code == 422
+    # Đổi sang provider tự động → các tác vụ chờ thủ công bị huỷ, tạo lại chạy tự động
+    r = pm.patch(f"/projects/{pid}", json={"video_provider_code": "mock"})
+    assert r.status_code == 200, r.text
+    assert r.json()["video_provider_code"] == "mock"
+    jobs = pm.post(f"/projects/{pid}/generate", json={}).json()
+    assert jobs and all(j["provider_code"] == "mock" for j in jobs)
+    all_jobs = pm.get("/generation-jobs", params={"project_id": pid}).json()
+    items = all_jobs["items"] if isinstance(all_jobs, dict) else all_jobs
+    assert {j["status"] for j in items if j["provider_code"] == "manual_flow"} == {"CANCELLED"}
