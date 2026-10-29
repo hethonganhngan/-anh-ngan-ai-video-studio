@@ -1,0 +1,10 @@
+.git
+.venv
+**/node_modules
+**/.next
+**/.next-*
+var
+.env
+tests/e2e/test-results*
+tests/e2e/playwright-report
+**/__pycache__
