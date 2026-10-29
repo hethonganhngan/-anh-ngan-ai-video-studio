@@ -79,7 +79,7 @@ def generate_ideas(ctx: Ctx, project_id) -> Script:
     user_prompt = A02.build_user_prompt_ideas(brief)
 
     def work(llm, actx):
-        res = llm.complete_json(system=system, prompt=user_prompt, schema=A02.IDEA_SCHEMA, max_tokens=4000,
+        res = llm.complete_json(system=system, prompt=user_prompt, schema=A02.IDEA_SCHEMA, max_tokens=16000,
                                 mock_fn=lambda: A02.mock_ideas(brief))
         return res.data, res
 
@@ -193,7 +193,7 @@ def write_script(ctx: Ctx, project_id) -> ScriptVersion:
     user_prompt = A02.build_user_prompt_script(brief, idea, chars, policy["scene_seconds"])
 
     def work(llm, actx):
-        res = llm.complete_json(system=system, prompt=user_prompt, schema=A02.SCRIPT_SCHEMA, max_tokens=8000,
+        res = llm.complete_json(system=system, prompt=user_prompt, schema=A02.SCRIPT_SCHEMA, max_tokens=16000,
                                 mock_fn=lambda: A02.mock_script(brief, idea, chars, policy["scene_seconds"]))
         return res.data, res
 

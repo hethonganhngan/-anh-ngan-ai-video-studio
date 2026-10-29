@@ -32,7 +32,7 @@ class AnthropicProvider(LLMProvider):
         usd = input_tokens / 1e6 * pin + output_tokens / 1e6 * pout
         return round(usd * get_settings().usd_vnd_rate, 2)
 
-    def complete_json(self, *, system, prompt, schema, max_tokens=4000, mock_fn=None):
+    def complete_json(self, *, system, prompt, schema, max_tokens=16000, mock_fn=None):
         a = self._anthropic
         start = time.perf_counter()
         try:
