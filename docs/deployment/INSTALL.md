@@ -84,7 +84,7 @@ Gồm: ruff, pytest (unit + integration trên DB `anngan_test`, render MP4 thậ
 ## E. Sao lưu & khôi phục
 
 - Tự động: cron `0 2 * * * /opt/anngan/scripts/backup.sh` (pg_dump `-Fc` + nén media local; giữ 14 bản).
-- Docker: `docker compose exec api python -c "from app.modules.administration.backup import create_backup; print(create_backup())"`; MinIO dùng `mc mirror` sang ổ khác.
+- Docker: `docker compose exec api python -c "from app.modules.administration.backup import create_backup; print(create_backup())"`; sao chép thêm volume `backend_var` (media) sang ổ/máy khác định kỳ.
 - Khôi phục: M15 → Backup → chọn file → gõ `RESTORE <tên file>` (chỉ Super Admin). Hành động được ghi audit log.
 
 ## F. Tài khoản khởi tạo an toàn
