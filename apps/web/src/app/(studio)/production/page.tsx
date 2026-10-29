@@ -31,8 +31,11 @@ const KIND: Record<string, { label: string; variant: "yellow" | "purple" | "gree
 };
 const ACTIVE = ["GENERATING", "RENDERING", "GENERATION_QUEUED"];
 
-function Providers({ current }: { current: string }) {
+function Providers({ project, refresh }: { project?: Project; refresh: () => void }) {
+  const current = project?.video_provider_code ?? "";
   const q = useQuery<Provider[]>({ queryKey: ["video-providers"], queryFn: () => api("/video-providers") });
+  const use = useAction((code: string) => api(`/projects/${project?.id}`, { method: "PATCH", body: { video_provider_code: code } }),
+    { success: "Đã đổi nhà cung cấp — bấm 'Tạo các cảnh còn thiếu' để tạo tự động", onSuccess: refresh });
   return (
     <Card>
       <CardHeader><CardTitle className="text-sm">Nhà cung cấp video</CardTitle><CardDescription>Google Flow không có API công khai — chỉ nhập thủ công. Real API chỉ dùng khi đã kết nối & xác minh ở M15.</CardDescription></CardHeader>
@@ -45,6 +48,14 @@ function Providers({ current }: { current: string }) {
               <Badge variant={p.available ? "green" : "gray"}>{p.available ? "Khả dụng" : "Không khả dụng"}</Badge>
               <Badge variant="gray">{p.connection_status}</Badge>
               <span className="text-xs text-slate-500">{formatVND(p.unit_cost_vnd_per_sec)}/giây</span>
+              {project && p.available && p.code !== current && (
+                <Can perm="project.edit">
+                  <Button size="sm" variant="outline" disabled={use.isPending} data-testid={`use-provider-${p.code}`}
+                    onClick={() => { if (!p.is_real || confirm(`Chuyển dự án sang ${p.name}? Mỗi cảnh sẽ tính phí thật khoảng ${formatVND(p.unit_cost_vnd_per_sec)}/giây. Các cảnh đang chờ nhập thủ công sẽ được huỷ.`)) use.mutate(p.code); }}>
+                    Dùng cho dự án
+                  </Button>
+                </Can>
+              )}
             </span>
           </div>
         ))}
@@ -187,7 +198,7 @@ export default function ProductionPage() {
                 <QueryView q={rows} isEmpty={(d) => !d.length} empty={<EmptyState title="Chưa có cảnh" description="Duyệt kịch bản tại M03 trước." />}>
                   {(d) => <div className="space-y-3">{d.map((r) => <SceneRow key={r.scene.id} r={r} project={pr} refresh={refresh} />)}</div>}
                 </QueryView>
-                <Providers current={p?.video_provider_code ?? ""} />
+                <Providers project={p} refresh={refresh} />
               </div>
             </div>
           )}
