@@ -143,3 +143,16 @@ def test_locked_character_flows_into_prompt(login, channels):
     assert c["code"] in prompt and "Character Lock v1" in prompt
     rep = pm.post(f"/projects/{p['id']}/validate-assets").json()
     assert rep["blocking"] == []
+
+
+def test_delete_character_blocked_while_project_uses_it(login, channels):
+    pm = login("pm")
+    c = pm.post("/characters", json={"name": "Chị Hoa", "appearance": "a", "outfit": "b"}).json()
+    p = create_project(pm, channels["ANNGAN"]["id"], topic="Mẹo pha sữa đúng cách", duration_sec=8,
+                       character_ids=[c["id"]], automation_level="MANUAL")
+    r = pm.delete(f"/characters/{c['id']}")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "CHARACTER_IN_USE" and p["code"] in r.json()["error"]["message"]
+    pm.post(f"/projects/{p['id']}/cancel", json={"note": "Thử xoá nhân vật"})
+    assert pm.delete(f"/characters/{c['id']}").json() == {"deleted": c["code"]}
+    assert pm.get(f"/characters/{c['id']}").status_code == 404
+    assert all(x["id"] != c["id"] for x in pm.get("/characters").json())

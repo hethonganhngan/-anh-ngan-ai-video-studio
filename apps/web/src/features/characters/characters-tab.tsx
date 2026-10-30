@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock as LockIcon, Plus, Save, Upload } from "lucide-react";
+import { Lock as LockIcon, Pencil, Plus, Save, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useChannels } from "@/hooks/use-lookups";
+import { ConfirmButton } from "@/components/app/confirm";
 import { Can } from "@/components/app/require";
 import { EmptyState, QueryView } from "@/components/app/states";
 import { AssetImage } from "@/components/app/media";
@@ -79,20 +80,47 @@ function RefUpload({ charId, refType, label, assetId, onDone, channelId }: { cha
   );
 }
 
-function CharacterDetail({ id }: { id: string }) {
+function CharacterSummary({ c }: { c: Character }) {
+  const voices = useQuery<Voice[]>({ queryKey: ["voices"], queryFn: () => api("/voices") });
+  const channels = useChannels();
+  const voice = (voices.data ?? []).find((v) => v.id === c.voice_profile_id);
+  const rows: [string, string | null | undefined][] = [["Kênh", (channels.data ?? []).find((x) => x.id === c.channel_id)?.name ?? "Dùng chung"],
+    ["Độ tuổi", c.age_range], ["Giới tính", c.gender], ["Tính cách", c.personality], ["Biểu cảm", c.expressions.join(", ")],
+    ["Giọng nói", voice ? `${voice.code} · ${voice.name}` : c.voice_profile_id ? "(giọng đã xoá)" : ""], ["Consent hình ảnh", CONSENT[c.consent_status]],
+    ["Quyền sử dụng", c.usage_rights]];
+  return (
+    <div className="space-y-3 text-sm" data-testid="character-summary">
+      {c.description && <p className="text-slate-700">{c.description}</p>}
+      <p><b>Ngoại hình:</b> {c.appearance || "—"}</p>
+      <p><b>Trang phục:</b> {c.outfit || "—"}</p>
+      <dl className="grid gap-x-6 gap-y-1 md:grid-cols-2">
+        {rows.map(([k, v]) => <div key={k} className="flex justify-between gap-2 border-b border-slate-100 py-1"><dt className="text-slate-500">{k}</dt><dd className="text-right">{v || "—"}</dd></div>)}
+      </dl>
+    </div>
+  );
+}
+
+function CharacterDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
   const qc = useQueryClient();
   const { has } = useAuth();
   const q = useQuery<Detail>({ queryKey: ["character", id], queryFn: () => api(`/characters/${id}`) });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [editing, setEditing] = useState(false);
+  useEffect(() => setEditing(false), [id]);
   const refresh = () => { qc.invalidateQueries({ queryKey: ["character", id] }); qc.invalidateQueries({ queryKey: ["characters"] }); };
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true);
-    try { await fn(); toast.success(ok); refresh(); }
+    try { await fn(); toast.success(ok); refresh(); return true; }
     catch (e) {
       const msg = errorMessage(e);
       toast.error(msg.includes("4 mắt") ? `${msg} — cần người khác có quyền duyệt` : msg);
+      return false;
     } finally { setBusy(false); }
+  };
+  const remove = async () => {
+    try { await api(`/characters/${id}`, { method: "DELETE" }); toast.success("Đã xoá nhân vật"); qc.invalidateQueries({ queryKey: ["characters"] }); onDeleted(); }
+    catch (e) { toast.error(errorMessage(e)); }
   };
   return (
     <QueryView q={q}>
@@ -106,20 +134,26 @@ function CharacterDetail({ id }: { id: string }) {
           <div className="space-y-4" data-testid="character-detail">
             <Card>
               <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm text-slate-500" data-testid="char-code">{c.code}</span>{c.name}
-                  <Badge variant={c.status === "LOCKED" ? "green" : "gray"}>{c.status === "LOCKED" ? "Đã khoá" : "Nháp"}</Badge>{c.data_mode === "DEMO" && <Badge variant="yellow">DEMO</Badge>}</CardTitle>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <CardTitle className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm text-slate-500" data-testid="char-code">{c.code}</span>{c.name}
+                    <Badge variant={c.status === "LOCKED" ? "green" : "gray"}>{c.status === "LOCKED" ? "Đã khoá" : "Nháp"}</Badge>{c.data_mode === "DEMO" && <Badge variant="yellow">DEMO</Badge>}</CardTitle>
+                  <Can perm="character.edit"><div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setEditing((x) => !x)} data-testid="char-edit">{editing ? <><X />Huỷ sửa</> : <><Pencil />Sửa</>}</Button>
+                    <ConfirmButton size="sm" variant="destructive" title={`Xoá nhân vật ${c.code}?`} requireText={c.code} confirmLabel="Xoá nhân vật"
+                      description="Nhân vật sẽ bị ẩn khỏi danh sách; Character Lock và ảnh tham chiếu vẫn được lưu làm lịch sử. Không xoá được khi dự án đang làm còn dùng nhân vật này."
+                      onConfirm={remove} data-testid="char-delete"><Trash2 />Xoá</ConfirmButton>
+                  </div></Can>
+                </div>
                 <CardDescription>Sửa hồ sơ không làm thay đổi Character Lock đang hiệu lực. Muốn áp dụng thay đổi phải tạo phiên bản khoá mới và duyệt.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
                   {REFS.map(([k, l]) => <RefUpload key={k} charId={c.id} refType={k} label={l} assetId={d.readiness.references[k]} onDone={refresh} channelId={c.channel_id} />)}
                 </div>
-                {has("character.edit") ? (
+                {editing && has("character.edit") ? (
                   <CharacterForm initial={initial} busy={busy} submitLabel="Lưu hồ sơ"
-                    onSubmit={(f) => run(() => api(`/characters/${c.id}`, { method: "PATCH", body: toBody(f) }), "Đã lưu hồ sơ nhân vật")} />
-                ) : (
-                  <div className="text-sm text-slate-700"><p>{c.description}</p><p><b>Ngoại hình:</b> {c.appearance}</p><p><b>Trang phục:</b> {c.outfit}</p></div>
-                )}
+                    onSubmit={async (f) => { if (await run(() => api(`/characters/${c.id}`, { method: "PATCH", body: toBody(f) }), "Đã lưu hồ sơ nhân vật")) setEditing(false); }} />
+                ) : <CharacterSummary c={c} />}
               </CardContent>
             </Card>
             <Card>
@@ -191,7 +225,7 @@ export function CharactersTab() {
         {creating ? (
           <Card><CardHeader><CardTitle>Nhân vật mới</CardTitle><CardDescription>Character ID được hệ thống sinh tự động.</CardDescription></CardHeader>
             <CardContent><CharacterForm initial={emptyForm} busy={busy} submitLabel="Tạo nhân vật" onSubmit={create} /></CardContent></Card>
-        ) : sel ? <CharacterDetail id={sel} /> : <EmptyState title="Chọn nhân vật" description="Chọn nhân vật bên trái hoặc tạo mới." />}
+        ) : sel ? <CharacterDetail id={sel} onDeleted={() => setSel(null)} /> : <EmptyState title="Chọn nhân vật" description="Chọn nhân vật bên trái hoặc tạo mới." />}
       </div>
     </div>
   );

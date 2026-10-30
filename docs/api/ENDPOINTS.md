@@ -1,6 +1,6 @@
 # Danh mục API (sinh tự động từ OpenAPI)
 
-Tổng: **166 endpoint**. Base URL: `/api/v1`. Tài liệu tương tác: `/docs` (Swagger UI).
+Tổng: **167 endpoint**. Base URL: `/api/v1`. Tài liệu tương tác: `/docs` (Swagger UI).
 
 Xác thực: cookie httpOnly `an_access` + header `X-CSRF-Token` (giá trị cookie `an_csrf`) cho request thay đổi dữ liệu, hoặc `Authorization: Bearer <token>` cho tích hợp máy-máy. Lỗi chuẩn: `{"error": {"code", "message", "details"}}`.
 
@@ -53,6 +53,7 @@ Xác thực: cookie httpOnly `an_access` + header `X-CSRF-Token` (giá trị coo
 | `POST` | `/api/v1/character-locks/{lock_id}/approve` | Approve Lock |
 | `GET` | `/api/v1/characters` | List Characters |
 | `POST` | `/api/v1/characters` | Create Character |
+| `DELETE` | `/api/v1/characters/{cid}` | Delete Character |
 | `GET` | `/api/v1/characters/{cid}` | Get Character |
 | `PATCH` | `/api/v1/characters/{cid}` | Update Character |
 | `POST` | `/api/v1/characters/{cid}/locks` | Create Lock |

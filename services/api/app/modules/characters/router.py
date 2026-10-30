@@ -63,6 +63,13 @@ def update_character(cid: uuid.UUID, data: CharacterPatch, ctx: Ctx = Depends(re
     return c
 
 
+@router.delete("/characters/{cid}")
+def delete_character(cid: uuid.UUID, ctx: Ctx = Depends(require("character.edit"))):
+    c = service.delete_character(ctx, cid)
+    ctx.db.commit()
+    return {"deleted": c.code}
+
+
 @router.post("/characters/{cid}/references", response_model=ReferenceOut, status_code=201)
 def add_reference(cid: uuid.UUID, data: ReferenceIn, ctx: Ctx = Depends(require("character.edit"))):
     r = service.add_reference(ctx, cid, data.ref_type, data.asset_id, data.note)

@@ -1728,6 +1728,45 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "B03 Character & Voice Manager"
+        ],
+        "summary": "Delete Character",
+        "operationId": "delete_character_api_v1_characters__cid__delete",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/characters/{cid}/references": {
