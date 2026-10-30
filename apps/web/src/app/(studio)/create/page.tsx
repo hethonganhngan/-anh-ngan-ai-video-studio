@@ -85,9 +85,12 @@ export default function CreatePage() {
   }, [providers.data, availableProviders, w.video_provider_code, setValue]);
   useEffect(() => {
     // Giọng AI đã consent (TTS tự đọc được) và nhân vật đã khoá (có ảnh tham chiếu) — người dùng vẫn đổi được
-    const v = (voices.data ?? []).find((x) => x.provider_code !== "manual" && x.consent_status === "GRANTED");
-    if (v && !w.voice_profile_id && !autofilled.current.voice) { autofilled.current.voice = true; setValue("voice_profile_id", v.id); }
+    // Ưu tiên giọng đã gắn cho nhân vật (giọng chính chủ), rồi giọng đã khoá
     const c = (characters.data ?? []).find((x) => x.status === "LOCKED" && x.active_lock_id);
+    const usable = (x: Voice) => x.provider_code !== "manual" && x.consent_status === "GRANTED";
+    const all = voices.data ?? [];
+    const v = all.find((x) => x.id === c?.voice_profile_id && usable(x)) ?? all.find((x) => usable(x) && x.status === "LOCKED") ?? all.find(usable);
+    if (v && !w.voice_profile_id && !autofilled.current.voice) { autofilled.current.voice = true; setValue("voice_profile_id", v.id); }
     if (c && !(w.character_ids ?? []).length && !autofilled.current.characters) { autofilled.current.characters = true; setValue("character_ids", [c.id]); }
   }, [voices.data, characters.data, w.voice_profile_id, w.character_ids, setValue]);
 
