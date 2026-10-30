@@ -17,6 +17,8 @@
 
 - **Flow tự động qua Chrome CDP (2026-10-30, D21, thử nghiệm):** provider `flow_cdp` (0đ, dùng lượt gói Google). Chạy `scripts/windows/start-flow-chrome.ps1`, đăng nhập Flow 1 lần, M15 → bật + Kiểm tra. M02 tự chọn provider thật rẻ nhất. Chạy thật PRJ-2610-0011 (đã kiểm chứng trên Flow thật): mỗi cảnh mở **phiên tác nhân mới**, gắn chip `@Mẹ Ánh Ngân` + `@Cửa hàng Ánh Ngân.jpg`, theo dõi ô đầu lưới (hiện % khi đang tạo) rồi mở ô đó → Tải xuống 720p gốc; tiếng gốc Flow = 0, chỉ giọng M04 (D21). Sửa lỗi có sẵn: nhập/tạo lại cảnh sau khi đã dựng thì timeline cũ giữ clip cũ → nay tự đồng bộ (`sync_timeline_clips`). Cần Playwright ≥1.64. Không tự tạo nội dung khác trong dự án Flow khi app đang tạo (app lấy ô mới nhất). Flow gắn hình mờ ✦ góc phải dưới.
 
+- **Giọng chính chủ VieNeu (2026-10-30, D23):** provider TTS `vieneu_local` (M04: "Giọng nhân bản từ bản ghi âm"), `scripts/windows/start-vieneu.ps1` cài/chạy VieNeu-TTS v3.8.3 (CPU), start/stop.ps1 tự bật/tắt nếu đã cài. Chưa cài/chạy thật trên máy (cần người dùng cho phép cài mã bên ngoài).
+
 ## Kiểm thử (lần chạy cuối 2026-10-29)
 | Bộ | Kết quả |
 |---|---|

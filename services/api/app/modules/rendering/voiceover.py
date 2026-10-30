@@ -12,7 +12,7 @@ from app.core.context import Ctx
 from app.core.errors import InvalidTransition, NotFound, ValidationFailed
 from app.media.models import Asset
 from app.media.service import ingest_file
-from app.media.storage import safe_remove
+from app.media.storage import get_storage, safe_remove
 from app.modules.administration import service as admin
 from app.modules.characters.models import VoiceProfile
 from app.modules.projects.service import lock_project
@@ -70,6 +70,9 @@ def generate_voiceover(ctx: Ctx, project_id, *, voice_profile_id=None, scene_vol
         raise ValidationFailed("Các cảnh trên timeline chưa có lời thoại", code="NO_DIALOGUE")
 
     provider = get_tts_provider(ctx.db, voice.provider_code, ctx.mode)
+    ref = ctx.db.get(Asset, voice.audio_reference_asset_id) if voice.audio_reference_asset_id else None
+    ref_path = get_storage().local_path(ref.storage_key) if ref else ""  # bản ghi chính chủ → giọng nhân bản
+    voice_id = voice.provider_voice_id or (voice.code if voice.provider_code == "vieneu_local" else "")
     estimated = Decimal(str(sum(provider.estimate_cost_vnd(s["text"]) for s in segs)))
     admin.check_budget(ctx, estimated=estimated, project=p, provider_code=provider.code)
 
@@ -78,7 +81,8 @@ def generate_voiceover(ctx: Ctx, project_id, *, voice_profile_id=None, scene_vol
     try:
         for seg in segs:
             try:
-                r = provider.synthesize(TTSRequest(text=seg["text"], voice_id=voice.provider_voice_id or "", style=_style(voice)))
+                r = provider.synthesize(TTSRequest(text=seg["text"], voice_id=voice_id, style=_style(voice),
+                                                   reference_audio_path=ref_path))
             except TTSError as e:
                 raise ValidationFailed(f"Cảnh {seg['order']}: tạo giọng đọc lỗi — {e}", code=e.code)
             cleanup.append(r.path)

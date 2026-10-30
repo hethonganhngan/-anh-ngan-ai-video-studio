@@ -8,6 +8,7 @@ class TTSRequest:
     text: str
     voice_id: str = ""
     style: str = ""  # mô tả giọng: vùng miền, sắc thái, tốc độ
+    reference_audio_path: str = ""  # bản ghi âm chính chủ (Voice Lock) cho provider nhân bản giọng
 
 
 @dataclass

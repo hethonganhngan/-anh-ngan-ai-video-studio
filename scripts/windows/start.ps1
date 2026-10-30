@@ -32,6 +32,9 @@ Start-Svc "worker" "$Py\celery.exe" @("-A", "app.celery_app", "worker", "-Q", "g
     "--pool", "threads", "--concurrency", "2", "-n", "worker@$env:COMPUTERNAME") "$Root\services\worker"
 Start-Svc "beat" "$Py\celery.exe" @("-A", "app.celery_app", "beat", "-l", "info", "--schedule", "$Data\run\celerybeat-schedule") "$Root\services\worker"
 
+# Giọng nhân bản VieNeu (nếu đã cài bằng start-vieneu.ps1)
+if (Test-Path "$Data\vieneu\.venv\Scripts\python.exe") { & "$PSScriptRoot\start-vieneu.ps1" }
+
 # 5. Web (bản build production; build nếu chưa có)
 $web = "$Root\apps\web"
 if (-not (Test-Path "$web\.next\BUILD_ID")) {

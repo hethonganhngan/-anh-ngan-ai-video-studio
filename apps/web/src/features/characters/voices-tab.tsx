@@ -50,10 +50,11 @@ function VoiceForm({ initial, onSubmit, busy, label }: { initial: F; onSubmit: (
       <div><Label>Provider</Label><NativeSelect value={f.provider_code} data-testid="voice-provider" onChange={(e) => {
         const v = e.target.value;
         setF((x) => ({ ...x, provider_code: v, ...(v === "gemini_tts" ? { provider_voice_id: GEMINI_VOICES.includes(x.provider_voice_id) ? x.provider_voice_id : "Kore", usage_rights: x.usage_rights || "Giọng AI dựng sẵn của Google Gemini TTS — dùng cho video thương mại Ánh Ngân" } : {}) }));
-      }}><option value="manual">Thu âm thủ công</option><option value="gemini_tts">Gemini TTS (giọng AI tiếng Việt)</option></NativeSelect></div>
+      }}><option value="manual">Thu âm thủ công</option><option value="gemini_tts">Gemini TTS (giọng AI tiếng Việt)</option><option value="vieneu_local">Giọng nhân bản từ bản ghi âm (VieNeu, chạy trên máy)</option></NativeSelect></div>
       <div><Label>Provider voice ID</Label>{f.provider_code === "gemini_tts"
         ? <NativeSelect value={f.provider_voice_id} onChange={(e) => set("provider_voice_id", e.target.value)} data-testid="voice-provider-id">{GEMINI_VOICES.map((n) => <option key={n} value={n}>{n}</option>)}</NativeSelect>
         : <Input value={f.provider_voice_id} onChange={(e) => set("provider_voice_id", e.target.value)} />}</div>
+      {f.provider_code === "vieneu_local" && <p className="text-[11px] text-slate-500 md:col-span-2" data-testid="voice-vieneu-hint">App đọc lời thoại mới bằng giọng nhân bản từ “Audio tham chiếu” (bản ghi âm chính chủ, nói rõ, ít tạp âm; app lấy 8 giây đầu có tiếng). Để trống “Provider voice ID” thì dùng mã Voice Profile. Cần consent “Đã đồng ý” của chính chủ.</p>}
       {f.provider_code === "gemini_tts" && <p className="text-[11px] text-slate-500 md:col-span-2">Giọng AI dựng sẵn không phải giọng người thật: chọn Consent “Đã đồng ý” và ghi phạm vi sử dụng. Accent, chất giọng, tốc độ được dùng làm hướng dẫn đọc. Nghe thử từng giọng tại aistudio.google.com.</p>}
       <div>
         <Label>Audio Reference {f.audio_reference_asset_id && "✓"}</Label>

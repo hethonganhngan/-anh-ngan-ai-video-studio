@@ -47,3 +47,16 @@ class AgentExecution(UUIDMixin, DataModeMixin, Base):
     triggered_by: Mapped[str | None] = mapped_column(String(64))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AgentSkill(UUIDMixin, TimestampMixin, Base):
+    """Skill = gói hướng dẫn (SKILL.md) cắm vào agent dùng LLM; bật/tắt từng skill, gắn cho nhiều agent (M14)."""
+    __tablename__ = "agent_skills"
+    code: Mapped[str] = mapped_column(String(80), unique=True)
+    name: Mapped[str] = mapped_column(String(160))
+    description: Mapped[str] = mapped_column(Text, default="")
+    content: Mapped[str] = mapped_column(Text)
+    agent_codes: Mapped[list] = mapped_column(JSONB, default=list)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    source: Mapped[str] = mapped_column(String(20), default="MANUAL")  # MANUAL | UPLOAD
+    sort_order: Mapped[int] = mapped_column(Integer, default=100)

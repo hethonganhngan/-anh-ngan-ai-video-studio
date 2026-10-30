@@ -233,11 +233,16 @@ def test_provider(pid: uuid.UUID, ctx: Ctx = Depends(require("admin.providers"))
     if acc.connection_status == "BUILTIN":
         return acc
     key = decrypt_secret(acc.secret_encrypted) if acc.secret_encrypted else None
-    if (acc.config or {}).get("adapter") == "flow_cdp":
-        from app.providers.video.registry import build_real_provider
-
+    if (acc.config or {}).get("adapter") in ("flow_cdp", "vieneu_local"):  # chạy trên máy, không cần key
         try:
-            build_real_provider(acc, None).test_connection()
+            if acc.config["adapter"] == "flow_cdp":
+                from app.providers.video.registry import build_real_provider
+
+                build_real_provider(acc, None).test_connection()
+            else:
+                from app.providers.tts.vieneu_local import VieNeuLocalProvider
+
+                VieNeuLocalProvider(config=acc.config).test_connection()
             acc.connection_status, acc.last_error, acc.last_verified_at = "VERIFIED", None, datetime.now(timezone.utc)
         except Exception as e:  # noqa: BLE001
             acc.connection_status, acc.last_error = "ERROR", str(e)[:500]

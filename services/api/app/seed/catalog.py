@@ -147,6 +147,13 @@ FLOW_CDP_CONFIG = {
             "bấm 'Kiểm tra'. Rủi ro: Google có thể hạn chế tài khoản vì truy cập tự động.",
 }
 
+VIENEU_CONFIG = {
+    "adapter": "vieneu_local", "base_url": "http://127.0.0.1:8200",
+    "note": "Nhân bản giọng từ bản ghi âm chính chủ của Voice Profile (M04), chạy trên máy — không phí (D23). "
+            "Chạy scripts/windows/start-vieneu.ps1, bấm 'Kiểm tra' rồi bật. Voice Profile: nhà cung cấp vieneu_local, "
+            "tên giọng = mã Voice Profile.",
+}
+
 PROVIDERS = [
     {"provider_type": "VIDEO", "provider_code": "mock", "name": "Mock Video Provider (DEMO)", "is_enabled": True,
      "connection_status": "BUILTIN", "unit_cost": 1500, "cost_unit": "SECOND",
@@ -177,6 +184,9 @@ PROVIDERS = [
     {"provider_type": "LLM", "provider_code": "anthropic", "name": "Anthropic Claude", "is_enabled": False,
      "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "TOKEN",
      "config": {"model": "claude-opus-5-5"}},
+    {"provider_type": "TTS", "provider_code": "vieneu_local", "name": "VieNeu-TTS — giọng nhân bản chạy trên máy",
+     "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "SECOND",
+     "config": VIENEU_CONFIG},
     {"provider_type": "TTS", "provider_code": "tts_none", "name": "Text-to-Speech (chưa kết nối)", "is_enabled": False,
      "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "CHAR",
      "config": {"note": "Voice-over hiện tải lên thủ công (file thu âm có consent)."}},
