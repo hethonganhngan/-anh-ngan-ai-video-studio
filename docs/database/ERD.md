@@ -1,6 +1,6 @@
 # Sơ đồ cơ sở dữ liệu (sinh tự động từ SQLAlchemy metadata)
 
-PostgreSQL 16 · **45 bảng** · khoá chính UUID · migration Alembic tại `migrations/`.
+PostgreSQL 16 · **46 bảng** · khoá chính UUID · migration Alembic tại `migrations/`.
 
 ```mermaid
 erDiagram
@@ -42,6 +42,19 @@ erDiagram
     datetime finished_at
     uuid id PK
     varchar data_mode
+  }
+  agent_skills {
+    varchar code
+    varchar name
+    text description
+    text content
+    jsonb agent_codes
+    boolean is_enabled
+    varchar source
+    integer sort_order
+    uuid id PK
+    datetime created_at
+    datetime updated_at
   }
   analytics_snapshots {
     uuid publication_id FK
@@ -890,6 +903,7 @@ erDiagram
 |---|---|---|
 | `agent_configs` | 14 |  |
 | `agent_executions` | 21 | tách DEMO/PRODUCTION |
+| `agent_skills` | 11 |  |
 | `analytics_snapshots` | 17 | tách DEMO/PRODUCTION |
 | `approvals` | 10 | tách DEMO/PRODUCTION |
 | `assets` | 28 | tách DEMO/PRODUCTION, soft delete, có phiên bản |

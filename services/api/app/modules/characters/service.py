@@ -24,6 +24,8 @@ CHAR_FIELDS = ["name", "description", "age_range", "gender", "appearance", "outf
 VOICE_FIELDS = ["name", "accent", "gender", "age_range", "tone", "speaking_rate", "provider_code", "provider_voice_id",
                 "audio_reference_asset_id", "consent_status", "consent_document_asset_id", "usage_rights", "rights_expires_at"]
 NOW = lambda: datetime.now(timezone.utc)  # noqa: E731
+# Dự án đã xong/huỷ không còn cần giọng → không chặn xoá
+VOICE_DONE_STATES = ("CANCELLED", "PUBLISHED", "ANALYTICS_COLLECTION", "FEEDBACK_REVIEW")
 
 
 def _asset_ok(ctx: Ctx, asset_id, kinds: set[str]) -> Asset:
@@ -201,6 +203,24 @@ def update_voice(ctx: Ctx, vid, data: dict) -> VoiceProfile:
         if k in VOICE_FIELDS:
             setattr(v, k, val)
     audit.record(ctx, "voice.update", "voice_profile", v.id, before=before, after={k: data[k] for k in before})
+    return v
+
+
+def delete_voice(ctx: Ctx, vid) -> VoiceProfile:
+    """Xoá mềm (deleted_at) — Voice Lock & audio giữ nguyên làm lịch sử. Chặn khi nhân vật/dự án đang dùng giọng."""
+    from app.modules.projects.models import Project
+
+    ctx.require("character.edit")
+    v = get_voice(ctx, vid)
+    chars = ctx.db.scalars(select(Character.code).where(Character.voice_profile_id == v.id, Character.deleted_at.is_(None))).all()
+    projects = ctx.db.scalars(select(Project.code).where(Project.voice_profile_id == v.id, Project.data_mode == ctx.mode,
+                                                         Project.status.not_in(VOICE_DONE_STATES))).all()
+    users = [f"nhân vật {c}" for c in chars] + [f"dự án {p}" for p in projects]
+    if users:
+        raise Conflict(f"Giọng đang được dùng bởi {', '.join(users)} — đổi giọng khác trước khi xoá", code="VOICE_IN_USE",
+                       details=users)
+    v.deleted_at = NOW()
+    audit.record(ctx, "voice.delete", "voice_profile", v.id, before={"code": v.code, "name": v.name})
     return v
 
 

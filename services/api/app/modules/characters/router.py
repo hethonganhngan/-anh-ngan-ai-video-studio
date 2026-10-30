@@ -112,6 +112,13 @@ def update_voice(vid: uuid.UUID, data: VoicePatch, ctx: Ctx = Depends(require("c
     return v
 
 
+@router.delete("/voices/{vid}")
+def delete_voice(vid: uuid.UUID, ctx: Ctx = Depends(require("character.edit"))):
+    v = service.delete_voice(ctx, vid)
+    ctx.db.commit()
+    return {"deleted": v.code}
+
+
 @router.post("/voices/{vid}/locks", response_model=LockOut, status_code=201)
 def create_voice_lock(vid: uuid.UUID, data: NoteIn, ctx: Ctx = Depends(require("character.edit"))):
     lock = service.create_voice_lock(ctx, vid, data.change_note)

@@ -102,6 +102,19 @@ def test_voice_lock_requires_consent_and_audio(login):
     assert pm.get(f"/voices/{v['id']}").json()["voice"]["status"] == "LOCKED"
 
 
+def test_delete_voice_blocked_while_in_use(login, channels):
+    pm, creator = login("pm"), login("creator")
+    v = pm.post("/voices", json={"name": "Giọng tạm", "accent": "Miền Nam"}).json()
+    c = pm.post("/characters", json={"name": "Chị Mai", "appearance": "a", "outfit": "b", "voice_profile_id": v["id"]}).json()
+    assert creator.delete(f"/voices/{v['id']}").status_code == 403
+    r = pm.delete(f"/voices/{v['id']}")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "VOICE_IN_USE" and c["code"] in r.json()["error"]["message"]
+    pm.patch(f"/characters/{c['id']}", json={"voice_profile_id": None})
+    assert pm.delete(f"/voices/{v['id']}").json() == {"deleted": v["code"]}
+    assert pm.get(f"/voices/{v['id']}").status_code == 404
+    assert all(x["id"] != v["id"] for x in pm.get("/voices").json())
+
+
 def test_scene_lock_versions(login, channels):
     pm, admin = login("pm"), login("admin")
     sl = pm.post("/scene-locks", json={"name": "Quầy tư vấn Ánh Ngân", "channel_id": channels["ANNGAN"]["id"],

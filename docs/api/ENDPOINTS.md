@@ -1,6 +1,6 @@
 # Danh mục API (sinh tự động từ OpenAPI)
 
-Tổng: **159 endpoint**. Base URL: `/api/v1`. Tài liệu tương tác: `/docs` (Swagger UI).
+Tổng: **166 endpoint**. Base URL: `/api/v1`. Tài liệu tương tác: `/docs` (Swagger UI).
 
 Xác thực: cookie httpOnly `an_access` + header `X-CSRF-Token` (giá trị cookie `an_csrf`) cho request thay đổi dữ liệu, hoặc `Authorization: Bearer <token>` cho tích hợp máy-máy. Lỗi chuẩn: `{"error": {"code", "message", "details"}}`.
 
@@ -63,6 +63,7 @@ Xác thực: cookie httpOnly `an_access` + header `X-CSRF-Token` (giá trị coo
 | `POST` | `/api/v1/voice-locks/{lock_id}/approve` | Approve Voice Lock |
 | `GET` | `/api/v1/voices` | List Voices |
 | `POST` | `/api/v1/voices` | Create Voice |
+| `DELETE` | `/api/v1/voices/{vid}` | Delete Voice |
 | `GET` | `/api/v1/voices/{vid}` | Get Voice |
 | `PATCH` | `/api/v1/voices/{vid}` | Update Voice |
 | `POST` | `/api/v1/voices/{vid}/locks` | Create Voice Lock |
@@ -101,6 +102,7 @@ Xác thực: cookie httpOnly `an_access` + header `X-CSRF-Token` (giá trị coo
 | `GET` | `/api/v1/projects/{project_id}/timeline` | Get Timeline |
 | `PUT` | `/api/v1/projects/{project_id}/timeline` | Save Timeline |
 | `POST` | `/api/v1/projects/{project_id}/timeline/reset` | Reset Timeline |
+| `POST` | `/api/v1/projects/{project_id}/voiceover/generate` | Generate Voiceover |
 | `GET` | `/api/v1/render-jobs` | Render Jobs |
 
 ## B07 Quality Control Engine
@@ -245,5 +247,10 @@ Xác thực: cookie httpOnly `an_access` + header `X-CSRF-Token` (giá trị coo
 |---|---|---|
 | `GET` | `/api/v1/agents` | List Agents |
 | `GET` | `/api/v1/agents/executions` | Executions |
+| `GET` | `/api/v1/agents/skills` | List Skills |
+| `POST` | `/api/v1/agents/skills` | Create Skill |
+| `POST` | `/api/v1/agents/skills/import` | Import Skill |
+| `DELETE` | `/api/v1/agents/skills/{skill_id}` | Delete Skill |
+| `PATCH` | `/api/v1/agents/skills/{skill_id}` | Update Skill |
 | `GET` | `/api/v1/agents/{code}` | Get Agent |
 | `PATCH` | `/api/v1/agents/{code}` | Update Agent |
