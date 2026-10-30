@@ -3,8 +3,9 @@
 Dùng lượt tạo video của gói Google (AI Pro/Ultra) → không phát sinh phí API. Rủi ro đã được CEO chấp nhận:
 Google có thể hạn chế tài khoản vì truy cập tự động; giao diện Flow đổi là phải chỉnh bộ chọn bên dưới.
 - Chrome chạy riêng: scripts/windows/start-flow-chrome.ps1 (cổng CDP chỉ nghe 127.0.0.1, profile riêng đã đăng nhập Flow).
-- Mỗi lần chỉ 1 cảnh (khoá Redis): gửi prompt → chờ cảnh mới (trang chỉnh sửa /edit/… hoặc ảnh thu nhỏ mới)
-  → Tải xuống 720p (kích thước gốc) → đóng tab.
+- Mỗi lần chỉ 1 cảnh (khoá Redis): phiên tác nhân mới → gửi prompt → ô đầu lưới hiện % rồi xong
+  → mở ô → Tải xuống 720p (kích thước gốc) → đóng tab. Mỗi câu lệnh gắn chip '@' nhân vật + ảnh cửa hàng
+  đã lưu trong dự án Flow (config 'ingredients') để giữ đúng khuôn mặt, trang phục và bối cảnh.
   Toàn bộ chạy đồng bộ trong submit_generation; provider_job_id mang kết quả (đường dẫn file hoặc lý do chờ thủ công).
 - Không đăng nhập, không vượt CAPTCHA: gặp trang đăng nhập/xác minh → NEEDS_MANUAL_ACTION, người dùng tự xử lý.
 - Đã bấm tạo mà quá thời gian chờ → NEEDS_MANUAL_ACTION (không gửi lại để khỏi tốn lượt): tải tay trên Flow rồi nhập ở M05.
@@ -28,11 +29,16 @@ SECTION = re.compile(r"^\[\d+\.\s*([^\]]+)\]\s*(.*)$", re.MULTILINE)
 LOCK_TAG = re.compile(r"\[(Character|Scene) Lock[^\]]*\]|\b(CHR|SCN)-\d{4}-\d{4}\s*")
 
 DOWNLOAD_BUTTON = "Tải nội dung nghe nhìn xuống"
+NEW_SESSION = "Bắt đầu phiên mới"  # mỗi cảnh 1 phiên tác nhân — phiên cũ khiến Flow mở lại/sửa cảnh trước
+PICKER_LIST = "Danh sách thành phần"  # hộp chọn thành phần mở khi gõ "@" trong ô lệnh
+DEFAULT_INGREDIENTS = ("Mẹ Ánh Ngân", "Cửa hàng Ánh Ngân")  # nhân vật + ảnh cửa hàng đã lưu trong dự án Flow
 QUALITY = re.compile(r"720p|Kích thước gốc")  # bản gốc — các mức 1080p/4K là tăng độ phân giải
+# Lưới dự án: nội dung mới nhất luôn ở ô đầu tiên; ô đang tạo hiện % tiến độ (ảnh thu nhỏ là URL ký số, không có id)
 EDIT_ID = re.compile(r"/edit/([0-9a-f-]{36})")
-THUMB_ID = re.compile(r"/image/([0-9a-f-]{36})")
-# Flow phát video bằng canvas (không có <video>): nhận ra nội dung mới qua id ảnh thu nhỏ trong lưới dự án
-_THUMBS_JS = "() => [...document.querySelectorAll('img')].map(i => i.src)"
+TILE = "flow-grid-tile-container"
+PROGRESS = re.compile(r"(?<![0-9])[0-9]{1,3} ?%")
+TILE_FAILED = re.compile(r"không thành công|thất bại|failed|error", re.I)
+START_TIMEOUT_SEC = 300  # tác nhân phải bắt đầu tạo (ô % xuất hiện) trong 5 phút
 
 
 def to_flow_prompt(prompt_text: str, duration_sec: int, speech_in_video: bool) -> str:
@@ -82,6 +88,7 @@ class FlowCDPProvider(VideoProvider):
         self.project_url = self.config.get("project_url", DEFAULT_PROJECT)
         self.timeout_sec = int(self.config.get("timeout_min", 15)) * 60
         self.speech_in_video = bool(self.config.get("speech_in_video", False))
+        self.ingredients = list(self.config.get("ingredients", DEFAULT_INGREDIENTS))
         self.unit_cost_vnd_per_sec = 0  # dùng lượt của gói Google — không tính phí API
 
     # ---------- trình duyệt ----------
@@ -109,11 +116,25 @@ class FlowCDPProvider(VideoProvider):
             return page, None, f"Không thấy ô '{PROMPT_BOX}' trên Flow (giao diện có thể đã đổi) — {page.url}"
         return page, box, None
 
-    def _thumb_ids(self, page) -> list[str]:
-        return [m.group(1) for src in page.evaluate(_THUMBS_JS) if (m := THUMB_ID.search(src or ""))]
+    def _attach(self, page, box, name: str) -> bool:
+        """Gõ "@" + tên → chọn trong 'Danh sách thành phần' → Flow chèn chip tham chiếu (nhân vật/ảnh) vào câu lệnh."""
+        chips = box.locator(".mention-chip")
+        before = chips.count()
+        box.press("Control+End")
+        page.keyboard.type(" @")  # "@" chỉ mở hộp chọn khi đứng sau khoảng trắng
+        page.wait_for_timeout(1500)
+        page.keyboard.type(name, delay=30)
+        page.wait_for_timeout(2500)
+        option = page.get_by_role("listbox", name=PICKER_LIST).get_by_role("option").filter(has_text=name)
+        if not option.count():
+            page.keyboard.press("Escape")
+            return False
+        option.first.click()
+        page.wait_for_timeout(1200)
+        return chips.count() > before
 
     def _try_download(self, page) -> tuple[str, str | None]:
-        """Ở trang chỉnh sửa của 1 nội dung: Tải xuống → 720p (kích thước gốc).
+        """Đang mở 1 nội dung: Tải xuống → 720p (kích thước gốc).
         ('ok', đường dẫn) | ('wait', None) chưa sẵn sàng | ('skip', None) không phải video."""
         btn = page.get_by_role("button", name=DOWNLOAD_BUTTON)
         if not btn.count():
@@ -122,7 +143,7 @@ class FlowCDPProvider(VideoProvider):
         items = page.get_by_role("menuitem")
         try:
             items.first.wait_for(timeout=5000)
-        except Exception:  # noqa: BLE001 — chưa có menu: video còn đang tạo
+        except Exception:  # noqa: BLE001 — chưa có menu: video còn đang xử lý
             page.keyboard.press("Escape")
             return "wait", None
         item = items.filter(has_text=QUALITY)
@@ -133,6 +154,7 @@ class FlowCDPProvider(VideoProvider):
             item.first.click()
         dl = d.value
         if not dl.suggested_filename.lower().endswith(".mp4"):
+            dl.cancel()
             return "skip", None
         fd, path = tempfile.mkstemp(suffix=".mp4")
         os.close(fd)
@@ -141,35 +163,54 @@ class FlowCDPProvider(VideoProvider):
             raise ProviderError("File video Flow tải về quá nhỏ", code="DOWNLOAD_FAILED", retryable=False)
         return "ok", path
 
-    def _wait_for_video(self, page, before: set[str]) -> str | None:
-        """Chờ nội dung mới: Flow tự mở trang chỉnh sửa của cảnh vừa tạo, hoặc ảnh thu nhỏ mới xuất hiện đầu lưới."""
-        skipped: set[str] = set()
-        deadline = time.monotonic() + self.timeout_sec
+    def _first_tile_text(self, page) -> str:
+        tile = page.locator(TILE).first
+        return tile.inner_text() if tile.count() else ""
+
+    def _wait_for_video(self, page) -> str | None:
+        """Ô đầu lưới hiện % (đang tạo) → hết % (xong) → mở ô đó → tải 720p. Không đoán theo ảnh thu nhỏ
+        (lưới tải trễ/URL ký số) và không dựa vào trang Flow tự mở (tác nhân có thể mở lại cảnh cũ)."""
+        started = False
+        now = time.monotonic()
+        deadline, start_deadline = now + self.timeout_sec, now + min(START_TIMEOUT_SEC, self.timeout_sec)
         while time.monotonic() < deadline:
             page.wait_for_timeout(10000)
             if CHALLENGE.search(page.url):
                 raise _NeedsManual("Flow chuyển sang trang đăng nhập/xác minh trong lúc tạo — xử lý trên Chrome Flow")
-            edit = EDIT_ID.search(page.url)
-            if edit is None:
-                new = [i for i in self._thumb_ids(page) if i not in before and i not in skipped]
-                if not new:
-                    continue
-                page.locator(f"img[src*='{new[0]}']").first.click()
-                try:
-                    page.wait_for_url(EDIT_ID, timeout=15000)
-                except Exception:  # noqa: BLE001
-                    continue
-                edit = EDIT_ID.search(page.url)
-            if edit.group(1) in skipped:
-                continue
-            state, path = self._try_download(page)
-            if state == "ok":
-                return path
-            if state == "skip":
-                skipped.add(edit.group(1))
-                skipped.update(self._thumb_ids(page)[:1])
+            if EDIT_ID.search(page.url):  # tác nhân tự mở trang chỉnh sửa → quay lại lưới để theo dõi ô mới
                 page.goto(self.project_url, wait_until="domcontentloaded", timeout=60000)
+                continue
+            text = self._first_tile_text(page)
+            if PROGRESS.search(text):
+                started = True
+                continue
+            if not started:
+                if time.monotonic() > start_deadline:
+                    raise _NeedsManual("Flow chưa bắt đầu tạo video sau 5 phút (tác nhân có thể đang hỏi lại) — "
+                                       "xem khung tác nhân trên Chrome Flow" + self._snapshot(page))
+                continue
+            if TILE_FAILED.search(text):
+                raise _NeedsManual(f"Flow báo tạo video không thành công: {text.strip()[:200]}" + self._snapshot(page))
+            page.locator(TILE).first.click()
+            for _ in range(6):
+                page.wait_for_timeout(3000)
+                state, path = self._try_download(page)
+                if state == "ok":
+                    return path
+                if state == "skip":
+                    raise _NeedsManual("Nội dung mới nhất trên Flow không phải video" + self._snapshot(page))
+            page.goto(self.project_url, wait_until="domcontentloaded", timeout=60000)
         return None
+
+    def _snapshot(self, page) -> str:
+        """Ảnh màn hình Flow lúc dừng để chẩn đoán (lỗi chụp không ảnh hưởng kết quả)."""
+        try:
+            fd, path = tempfile.mkstemp(prefix="flow_", suffix=".png")
+            os.close(fd)
+            page.screenshot(path=path)
+            return f". Ảnh màn hình: {path}"
+        except Exception:  # noqa: BLE001
+            return ""
 
     def _generate(self, spec: GenerationSpec) -> str:
         from playwright.sync_api import sync_playwright
@@ -181,19 +222,29 @@ class FlowCDPProvider(VideoProvider):
                 page, box, problem = self._open_project(ctx)
                 if problem:
                     return MANUAL + problem
-                page.wait_for_timeout(4000)  # chờ lưới nội dung tải xong để lấy mốc
-                before = set(self._thumb_ids(page))
+                page.wait_for_timeout(3000)
+                new_session = page.get_by_role("button", name=NEW_SESSION)
+                if new_session.count():
+                    new_session.first.click()
+                    page.wait_for_timeout(1500)
                 box.click()
-                box.fill(to_flow_prompt(spec.prompt_text, spec.duration_sec, self.speech_in_video))
+                prompt = to_flow_prompt(spec.prompt_text, spec.duration_sec, self.speech_in_video)
+                box.fill(prompt + (" Tham chiếu nhân vật và bối cảnh cửa hàng:" if self.ingredients else ""))
+                missing = [n for n in self.ingredients if not self._attach(page, box, n)]
+                if self.ingredients and len(missing) == len(self.ingredients):
+                    # không gắn được gì → video sẽ lệch nhân vật/bối cảnh: dừng trước khi tốn lượt
+                    return MANUAL + (f"Không tìm thấy thành phần {', '.join(missing)} trong dự án Flow "
+                                     "(gõ @ trên Flow để kiểm tra tên) — chưa gửi tạo video")
                 page.get_by_role("button", name=SUBMIT_BUTTON).click()
                 try:
-                    path = self._wait_for_video(page, before)
+                    path = self._wait_for_video(page)
                 except _NeedsManual as e:
                     return MANUAL + str(e)
                 if path:
                     return OK + path
                 return MANUAL + (f"Đã gửi lên Flow nhưng sau {self.timeout_sec // 60} phút chưa tải được video — "
-                                 "kiểm tra trên Flow, tải MP4 rồi 'Nhập từ Flow' (không tự gửi lại để khỏi tốn lượt)")
+                                 "kiểm tra trên Flow, tải MP4 rồi 'Nhập từ Flow' (không tự gửi lại để khỏi tốn lượt)"
+                                 + self._snapshot(page))
             finally:
                 if page is not None:
                     page.close()  # chỉ đóng tab đã mở; thoát sync_playwright là ngắt CDP, Chrome vẫn chạy

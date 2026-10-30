@@ -47,6 +47,26 @@ def default_timeline(ctx: Ctx, p: Project) -> dict:
     }
 
 
+def sync_timeline_clips(ctx: Ctx, p: Project) -> list[int]:
+    """Cảnh vừa được tạo lại/nhập clip mới → clip trên timeline đã lưu trỏ sang video đang chọn của cảnh
+    (giữ nguyên âm lượng, bỏ cắt đầu/cuối vì clip mới khác clip cũ). Trả về số thứ tự các cảnh đã đổi."""
+    if not p.timeline:
+        return []
+    scenes = {str(s.id): s for s in ctx.db.scalars(select(Scene).where(Scene.project_id == p.id)).all()}
+    tl, changed = dict(p.timeline), []
+    clips = []
+    for c in tl.get("clips", []):
+        s = scenes.get(c.get("scene_id"))
+        if s and s.selected_asset_id and c.get("asset_id") != str(s.selected_asset_id):
+            c = {**c, "asset_id": str(s.selected_asset_id), "trim_start": 0.0, "trim_end": None}
+            changed.append(s.order_index + 1)
+        clips.append(c)
+    if changed:
+        tl["clips"] = clips
+        p.timeline = tl
+    return changed
+
+
 def get_timeline(ctx: Ctx, project_id) -> dict:
     p = get_project(ctx, project_id)
     return p.timeline if p.timeline else default_timeline(ctx, p)

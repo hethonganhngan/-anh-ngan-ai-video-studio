@@ -38,8 +38,6 @@ def test_cdp_only_localhost():
     assert e.value.code == "BAD_URL"
 
 
-OLD = "https://flow-content.google/image/11111111-1111-1111-1111-111111111111"
-NEW = "https://flow-content.google/image/22222222-2222-2222-2222-222222222222"
 EDIT = F.DEFAULT_PROJECT + "/edit/33333333-3333-3333-3333-333333333333"
 
 
@@ -60,13 +58,35 @@ class FakeLocator:
             return [i for i in items if self.text is None or self.text.search(i)]
         if self.kind == "button" and self.name == F.DOWNLOAD_BUTTON:
             return ["download"] if EDIT_ID_RE.search(self.p.url) else []
+        if self.kind == "option":  # hộp chọn "@": chỉ có các thành phần đã lưu trong dự án Flow
+            q = s["typed"].rsplit("@", 1)[-1]
+            return [n for n in s["library"] if q and n.startswith(q) and (self.text is None or self.text in n)]
+        if self.kind == "chip":
+            return list(s["chips"])
+        if self.kind == "tile":
+            return ["tile"]
         return ["x"]
+
+    def inner_text(self):  # ô đầu lưới: % khi đang tạo, tiêu đề khi xong
+        s = self.p.s
+        if s["clicked"] and not s["ready"] and s["ticks"] - s["clicked_at"] >= s.get("start_at", 1):
+            return "45%"
+        return s["first_tile"]
 
     def count(self):
         return len(self._items())
 
     def filter(self, has_text):
         return FakeLocator(self.p, self.kind, self.name, has_text)
+
+    def get_by_role(self, role, name=None):
+        return FakeLocator(self.p, role, name)
+
+    def locator(self, sel):
+        return FakeLocator(self.p, "chip" if "mention-chip" in sel else "other")
+
+    def press(self, key):
+        pass
 
     def wait_for(self, **_):
         if self.kind == "textbox" and self.p.s.get("redirect"):
@@ -81,11 +101,15 @@ class FakeLocator:
         s = self.p.s
         if self.kind == "button" and self.name == F.SUBMIT_BUTTON:
             assert s["filled"]
-            s["clicked"] = True
+            s["clicked"], s["clicked_at"] = True, s["ticks"]
         elif self.kind == "button" and self.name == F.DOWNLOAD_BUTTON:
             s["menu"] = s["ready"]
-        elif self.kind == "img":
+        elif self.kind == "option":
+            s["chips"].append(self._items()[0])
+            s["typed"] = ""
+        elif self.kind == "tile":
             self.p.url = EDIT
+            s["opened"] = s["first_tile"]
         elif self.kind == "menuitem":
             s["downloads"].append(self.text.pattern)
 
@@ -93,7 +117,8 @@ class FakeLocator:
 class FakePage:
     def __init__(self, state):
         self.s, self.url = state, F.DEFAULT_PROJECT
-        self.keyboard = types.SimpleNamespace(press=lambda k: state.update(menu=False))
+        self.keyboard = types.SimpleNamespace(press=lambda k: state.update(menu=False, typed=""),
+                                              type=lambda t, delay=0: state.update(typed=state["typed"] + t))
 
     def goto(self, url, **_):
         self.url = self.s.get("redirect", url)
@@ -102,7 +127,7 @@ class FakePage:
         return FakeLocator(self, role, name)
 
     def locator(self, sel):
-        return FakeLocator(self, "img" if sel.startswith("img") else "other")
+        return FakeLocator(self, "tile" if sel == F.TILE else "other")
 
     def wait_for_url(self, pattern, **_):
         assert pattern.search(self.url)
@@ -110,12 +135,9 @@ class FakePage:
     def wait_for_timeout(self, _):
         s = self.s
         s["ticks"] += 1
-        if s["clicked"] and s["ticks"] >= s["ready_at"]:
+        if s["clicked"] and s["ticks"] - s["clicked_at"] >= s["ready_at"] and not s["ready"]:
             s["ready"] = True
-            s["thumbs"] = [NEW, *[t for t in s["thumbs"] if t != NEW]]
-
-    def evaluate(self, js, *_):
-        return list(self.s["thumbs"])
+            s["first_tile"] = "Mẹ tư vấn chọn sữa (mới)"
 
     def expect_download(self, **_):
         s = self.s
@@ -123,7 +145,7 @@ class FakePage:
         class Ctx:
             def __enter__(self_inner):
                 return types.SimpleNamespace(value=types.SimpleNamespace(
-                    suggested_filename="Mẹ_tư_vấn_chọn_sữa_22222222.mp4",
+                    suggested_filename=s["file_name"], cancel=lambda: s.update(cancelled=True),
                     save_as=lambda path: open(path, "wb").write(MP4)))
 
             def __exit__(self_inner, *a):
@@ -135,14 +157,18 @@ class FakePage:
     def close(self):
         self.s["closed"] = True
 
+    def screenshot(self, path):
+        open(path, "wb").write(b"png")
+
 
 EDIT_ID_RE = F.EDIT_ID
 
 
 @pytest.fixture
 def fake_chrome(monkeypatch):
-    s = {"thumbs": [OLD], "ticks": 0, "ready_at": 3, "ready": False, "clicked": False, "menu": False,
-         "filled": None, "closed": False, "downloads": []}
+    s = {"first_tile": "Cửa hàng Ánh Ngân.jpg", "ticks": 0, "ready_at": 3, "ready": False, "clicked": False, "menu": False,
+         "filled": None, "closed": False, "downloads": [], "typed": "", "chips": [],
+         "library": ["Mẹ Ánh Ngân", "Cửa hàng Ánh Ngân.jpg"], "file_name": "Mẹ_tư_vấn_chọn_sữa_22222222.mp4"}
     ctx = types.SimpleNamespace(new_page=lambda: FakePage(s))
     browser = types.SimpleNamespace(contexts=[ctx])
 
@@ -156,6 +182,7 @@ def fake_chrome(monkeypatch):
             return False
 
     monkeypatch.setitem(sys.modules, "playwright.sync_api", types.SimpleNamespace(sync_playwright=PW))
+    monkeypatch.setattr(F.time, "monotonic", lambda: s["ticks"] * 10.0)  # mỗi lần chờ 10 giây giả
     return s
 
 
@@ -166,6 +193,14 @@ def test_generate_opens_new_item_and_downloads_original_720p(fake_chrome):
     with open(job_id[len(F.OK):], "rb") as f:
         assert f.read() == MP4
     assert "Mẹ Ánh Ngân chào khách" in fake_chrome["filled"]
+    assert fake_chrome["chips"] == ["Mẹ Ánh Ngân", "Cửa hàng Ánh Ngân.jpg"]  # gắn nhân vật + ảnh cửa hàng trước khi tạo
+    assert fake_chrome["opened"] == "Mẹ tư vấn chọn sữa (mới)"  # mở đúng ô vừa tạo xong, không phải nội dung cũ
+
+
+def test_no_ingredient_found_stops_before_spending_credits(fake_chrome):
+    fake_chrome["library"] = []
+    job_id = FlowCDPProvider("flow_cdp", "Flow", {})._generate(GenerationSpec(job_ref="j", prompt_text=PROMPT))
+    assert job_id.startswith(F.MANUAL) and "Không tìm thấy thành phần" in job_id and not fake_chrome["clicked"]
 
 
 def test_timeout_needs_manual_without_resubmit(fake_chrome):
@@ -178,3 +213,9 @@ def test_login_page_needs_manual_and_nothing_submitted(fake_chrome):
     fake_chrome["redirect"] = "https://accounts.google.com/v3/signin"
     job_id = FlowCDPProvider("flow_cdp", "Flow", {})._generate(GenerationSpec(job_ref="j", prompt_text=PROMPT))
     assert job_id.startswith(F.MANUAL) and "đăng nhập" in job_id and not fake_chrome["clicked"]
+
+
+def test_flow_never_starts_needs_manual_without_opening_old_items(fake_chrome):
+    fake_chrome.update(start_at=10**6, ready_at=10**6)  # tác nhân không tạo gì (vd. hỏi lại)
+    job_id = FlowCDPProvider("flow_cdp", "Flow", {})._generate(GenerationSpec(job_ref="j", prompt_text=PROMPT))
+    assert job_id.startswith(F.MANUAL) and "chưa bắt đầu tạo" in job_id and "opened" not in fake_chrome

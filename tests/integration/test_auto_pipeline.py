@@ -1,6 +1,6 @@
 """Chế độ AUTO (D19): một lần chạy AI Director từ chủ đề → video hoàn chỉnh (FINAL_QC) — tự duyệt kịch bản sạch,
 tự lồng giọng Voice Profile (M04); kịch bản vi phạm tuân thủ CRITICAL thì dừng ở cổng chờ người duyệt."""
-from tests.helpers import create_project
+from tests.helpers import create_project, make_video
 
 
 def _voice(pm) -> str:
@@ -43,3 +43,25 @@ def test_auto_stops_at_review_when_script_violates_compliance(login, channels):
     r = pm.post(f"/projects/{pid}/advance").json()
     assert r["status"] == "SCRIPT_REVIEW" and any(s.startswith("Dừng") for s in r["steps"]), r
     assert pm.get(f"/projects/{pid}/script").json()["script"]["status"] != "APPROVED"
+
+
+def test_replacing_scene_clip_after_final_rerenders_with_new_clip(login, channels):
+    """Hồi quy: dự án đã có timeline → nhập clip mới cho cảnh thì bản dựng lại phải dùng clip mới, không giữ clip cũ."""
+    pm, editor = login("pm"), login("editor")
+    p = create_project(pm, channels["ANNGAN"]["id"], topic="Thay clip sau khi dựng", duration_sec=8,
+                       automation_level="AUTO", voice_profile_id=_voice(pm))
+    pm.post(f"/projects/{p['id']}/advance")
+    assert pm.get(f"/projects/{p['id']}").json()["status"] == "FINAL_QC"
+    scene = pm.get(f"/projects/{p['id']}/script").json()["scenes"][0]
+    old_asset = pm.get(f"/projects/{p['id']}/timeline").json()
+    old_asset = old_asset.get("timeline", old_asset)["clips"][0]["asset_id"]
+    renders_before = len(pm.get(f"/projects/{p['id']}/overview").json()["renders"])
+
+    with open(make_video("flow_new.mp4", 720, 1280, 8), "rb") as f:
+        r = editor.post(f"/scenes/{scene['id']}/import-flow", files={"file": ("flow_new.mp4", f)})
+    assert r.status_code == 200, r.text
+    tl = pm.get(f"/projects/{p['id']}/timeline").json()
+    tl = tl.get("timeline", tl)
+    assert tl["clips"][0]["asset_id"] == r.json()["asset_id"] != old_asset
+    ov = pm.get(f"/projects/{p['id']}/overview").json()
+    assert ov["project"]["status"] == "FINAL_QC" and len(ov["renders"]) > renders_before

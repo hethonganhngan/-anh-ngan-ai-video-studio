@@ -227,11 +227,15 @@ def _generation_failed(ctx: Ctx, job, scene, project, code: str, message: str, r
 def _auto_voiceover(ctx: Ctx, project) -> None:
     """AUTO: lồng thoại bằng giọng Voice Profile (M04) của dự án trước khi dựng. Lỗi không chặn dựng
     (video vẫn có phụ đề) — ghi vào last_error để người dùng biết và tạo lại giọng ở M06."""
+    from app.modules.administration.models import ProviderAccount
     from app.modules.rendering.voiceover import generate_voiceover
 
+    # provider có thể tự sinh tiếng nói (vd. Flow) → cấu hình hạ tiếng gốc về 0 để không chồng 2 giọng
+    acc = ctx.db.scalar(select(ProviderAccount).where(ProviderAccount.provider_code == project.video_provider_code))
+    volume = float((acc.config or {}).get("voiceover_scene_volume", 0.35)) if acc else 0.35
     try:
         with ctx.db.begin_nested():
-            generate_voiceover(ctx, project.id, actor_check=False)
+            generate_voiceover(ctx, project.id, scene_volume=volume, actor_check=False)
     except AppError as e:
         project.last_error = f"Lồng tiếng tự động lỗi: {e.message}"[:2000]
         log.warning("auto voiceover %s: %s", project.code, e.message)
@@ -267,8 +271,10 @@ def _after_scene_change(ctx: Ctx, project) -> None:
                 sm.transition(ctx, project, "SCENE_QC", note="Cảnh được tạo lại — QC lại")
             result = run_scene_qc(ctx, project)
             if result["all_passed"] and project.automation_level != "MANUAL":
-                from app.modules.rendering.service import start_render
+                from app.modules.rendering.service import start_render, sync_timeline_clips
 
+                sync_timeline_clips(ctx, project)  # timeline đã lưu phải dùng clip mới của cảnh vừa tạo lại
+                project.last_error = None
                 if project.automation_level == "AUTO":
                     _auto_voiceover(ctx, project)
                 start_render(ctx, project, timeline=None, actor_check=False)
