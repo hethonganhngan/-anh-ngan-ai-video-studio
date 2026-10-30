@@ -14,7 +14,7 @@ from app.media.models import Asset
 from app.media.service import ingest_file
 from app.media.storage import get_storage, safe_remove
 from app.modules.administration import service as admin
-from app.modules.characters.models import VoiceProfile
+from app.modules.characters.models import Character, VoiceProfile
 from app.modules.projects.service import lock_project
 from app.modules.rendering.service import default_timeline, validate_timeline
 from app.modules.scripts.models import Scene
@@ -25,6 +25,12 @@ from sqlalchemy import select
 
 EDITABLE = ("SCENE_QC", "FINAL_QC", "RENDERING", "GENERATING", "NEEDS_MANUAL_ACTION", "APPROVAL_PENDING")
 MAX_SPEEDUP = 1.25
+
+
+def _character_voice(ctx: Ctx, p) -> str | None:
+    """Dự án chưa chọn giọng → dùng giọng gắn với nhân vật (Character Lock), nếu dự án chỉ có 1 nhân vật có giọng."""
+    voices = {c.voice_profile_id for c in (ctx.db.get(Character, cid) for cid in (p.character_ids or [])) if c and c.voice_profile_id}
+    return next(iter(voices)) if len(voices) == 1 else None
 
 
 def _style(v: VoiceProfile) -> str:
@@ -59,7 +65,7 @@ def generate_voiceover(ctx: Ctx, project_id, *, voice_profile_id=None, scene_vol
         raise InvalidTransition(f"Không tạo voice-over ở trạng thái {p.status}")
     tl = dict(p.timeline) if p.timeline else default_timeline(ctx, p)
     validate_timeline(ctx, p, tl)
-    vid = voice_profile_id or p.voice_profile_id
+    vid = voice_profile_id or p.voice_profile_id or _character_voice(ctx, p)
     voice = ctx.db.get(VoiceProfile, vid) if vid else None
     if voice is None or voice.deleted_at is not None or voice.data_mode != ctx.mode:
         raise NotFound("Dự án chưa chọn Voice Profile")

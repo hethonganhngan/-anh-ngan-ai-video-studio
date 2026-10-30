@@ -65,3 +65,17 @@ def test_replacing_scene_clip_after_final_rerenders_with_new_clip(login, channel
     assert tl["clips"][0]["asset_id"] == r.json()["asset_id"] != old_asset
     ov = pm.get(f"/projects/{p['id']}/overview").json()
     assert ov["project"]["status"] == "FINAL_QC" and len(ov["renders"]) > renders_before
+
+
+def test_voiceover_falls_back_to_character_voice():
+    """Dự án tạo không chọn giọng → lồng tiếng dùng giọng gắn với nhân vật (giọng chính chủ); nhiều giọng khác nhau → không đoán."""
+    import types
+
+    from app.modules.rendering.voiceover import _character_voice
+
+    chars = {"c1": types.SimpleNamespace(voice_profile_id="v-chinh-chu"), "c2": types.SimpleNamespace(voice_profile_id=None),
+             "c3": types.SimpleNamespace(voice_profile_id="v-khac")}
+    ctx = types.SimpleNamespace(db=types.SimpleNamespace(get=lambda _model, cid: chars.get(cid)))
+    assert _character_voice(ctx, types.SimpleNamespace(character_ids=["c1", "c2"])) == "v-chinh-chu"
+    assert _character_voice(ctx, types.SimpleNamespace(character_ids=["c1", "c3"])) is None
+    assert _character_voice(ctx, types.SimpleNamespace(character_ids=[])) is None
