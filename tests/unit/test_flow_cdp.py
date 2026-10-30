@@ -173,7 +173,7 @@ EDIT_ID_RE = F.EDIT_ID
 def fake_chrome(monkeypatch):
     s = {"first_tile": "Cửa hàng Ánh Ngân.jpg", "ticks": 0, "ready_at": 3, "ready": False, "clicked": False, "menu": False,
          "filled": None, "closed": False, "downloads": [], "typed": "", "chips": [],
-         "library": ["Mẹ Ánh Ngân", "Cửa hàng Ánh Ngân.jpg"], "file_name": "Mẹ_tư_vấn_chọn_sữa_22222222.mp4"}
+         "library": ["MeAnhNgan", "Cửa hàng Ánh Ngân.jpg"], "file_name": "Mẹ_tư_vấn_chọn_sữa_22222222.mp4"}
     ctx = types.SimpleNamespace(new_page=lambda: FakePage(s))
     browser = types.SimpleNamespace(contexts=[ctx])
 
@@ -198,7 +198,7 @@ def test_generate_opens_new_item_and_downloads_original_720p(fake_chrome):
     with open(job_id[len(F.OK):], "rb") as f:
         assert f.read() == MP4
     assert "Mẹ Ánh Ngân chào khách" in fake_chrome["filled"]
-    assert fake_chrome["chips"] == ["Mẹ Ánh Ngân", "Cửa hàng Ánh Ngân.jpg"]  # gắn nhân vật + ảnh cửa hàng trước khi tạo
+    assert fake_chrome["chips"] == ["MeAnhNgan", "Cửa hàng Ánh Ngân.jpg"]  # gắn nhân vật + ảnh cửa hàng trước khi tạo
     assert fake_chrome["opened"] == "Mẹ tư vấn chọn sữa (mới)"  # mở đúng ô vừa tạo xong, không phải nội dung cũ
 
 

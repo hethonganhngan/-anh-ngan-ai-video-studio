@@ -32,7 +32,7 @@ LOCK_TAG = re.compile(r"\[(Character|Scene) Lock[^\]]*\]|\b(CHR|SCN)-\d{4}-\d{4}
 DOWNLOAD_BUTTON = "Tải nội dung nghe nhìn xuống"
 NEW_SESSION = "Bắt đầu phiên mới"  # mỗi cảnh 1 phiên tác nhân — phiên cũ khiến Flow mở lại/sửa cảnh trước
 PICKER_LIST = "Danh sách thành phần"  # hộp chọn thành phần mở khi gõ "@" trong ô lệnh
-DEFAULT_INGREDIENTS = ("Mẹ Ánh Ngân", "Cửa hàng Ánh Ngân")  # nhân vật + ảnh cửa hàng đã lưu trong dự án Flow
+DEFAULT_INGREDIENTS = ("MeAnhNgan", "Cửa hàng Ánh Ngân")  # nhân vật + ảnh cửa hàng đã lưu trong dự án Flow
 QUALITY = re.compile(r"720p|Kích thước gốc")  # bản gốc — các mức 1080p/4K là tăng độ phân giải
 # Lưới dự án: nội dung mới nhất luôn ở ô đầu tiên; ô đang tạo hiện % tiến độ (ảnh thu nhỏ là URL ký số, không có id)
 EDIT_ID = re.compile(r"/edit/([0-9a-f-]{36})")

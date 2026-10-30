@@ -1,6 +1,7 @@
 """B10 — Publishing Manager."""
 import json
 import os
+import re
 import zipfile
 from datetime import datetime, timezone
 from urllib.parse import urlparse
@@ -21,6 +22,8 @@ from app.workflows import state_machine as sm
 from sqlalchemy import select
 
 PLATFORMS = set(PUBLISHERS)
+AI_LABEL = "(*) Nhân vật minh hoạ, video có sử dụng AI."
+AI_LABEL_RE = re.compile(r"minh h(oạ|ọa|oa)", re.I)
 PUBLISHABLE = {"APPROVED", "PUBLISH_QUEUED", "PUBLISHED", "ANALYTICS_COLLECTION", "FEEDBACK_REVIEW"}
 
 
@@ -43,6 +46,13 @@ def _approved_render(ctx: Ctx, p: Project) -> Render:
     return r
 
 
+def with_ai_label(caption: str) -> str:
+    """Nhân vật trong video là nhân vật AI → mô tả bài luôn có ghi chú 'nhân vật minh hoạ' (D24), không thêm trùng."""
+    if AI_LABEL_RE.search(caption):
+        return caption
+    return f"{caption.rstrip()}\n\n{AI_LABEL}" if caption.strip() else AI_LABEL
+
+
 def check_caption(ctx: Ctx, channel_id, caption: str, hashtags: list[str]) -> list[dict]:
     bp = ctx.db.scalar(select(BrandProfile).where(BrandProfile.channel_id == channel_id))
     return [f.to_dict() for f in scan(caption + " " + " ".join(hashtags), bp.forbidden_terms if bp else [])]
@@ -62,6 +72,7 @@ def create_publication(ctx: Ctx, project_id, *, platform: str, caption: str, has
     if publish_mode not in ("MANUAL", "API"):
         raise ValidationFailed("Chế độ đăng không hợp lệ")
     render = _approved_render(ctx, p)
+    caption = with_ai_label(caption)
     tags = [h if h.startswith("#") else f"#{h}" for h in (t.strip() for t in hashtags) if h]
     issues = check_caption(ctx, p.channel_id, caption, tags)
     blocking = [i for i in issues if i["severity"] in ("CRITICAL", "MAJOR")]
@@ -83,6 +94,8 @@ def update_publication(ctx: Ctx, pid, data: dict) -> Publication:
     pub = get_pub(ctx, pid)
     if pub.status in ("PUBLISHED", "CANCELLED"):
         raise InvalidTransition("Bài đã đăng/huỷ không sửa được")
+    if "caption" in data:
+        data = {**data, "caption": with_ai_label(data["caption"] or "")}
     if "caption" in data or "hashtags" in data:
         caption = data.get("caption", pub.caption)
         tags = data.get("hashtags", pub.hashtags)
