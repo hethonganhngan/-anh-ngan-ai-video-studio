@@ -26,6 +26,7 @@ OK, MANUAL = "flowcdp:ok:", "flowcdp:manual:"
 LOCK_KEY = "anngan:flow_cdp:lock"
 CHALLENGE = re.compile(r"accounts\.google\.com|/sorry/|recaptcha|challenge", re.I)
 SECTION = re.compile(r"^\[\d+\.\s*([^\]]+)\]\s*(.*)$", re.MULTILINE)
+NOTE = re.compile(r"^Lưu ý:\s*(.+)$", re.MULTILINE)
 LOCK_TAG = re.compile(r"\[(Character|Scene) Lock[^\]]*\]|\b(CHR|SCN)-\d{4}-\d{4}\s*")
 
 DOWNLOAD_BUTTON = "Tải nội dung nghe nhìn xuống"
@@ -48,11 +49,12 @@ def to_flow_prompt(prompt_text: str, duration_sec: int, speech_in_video: bool) -
     def get(k: str) -> str:
         return re.sub(r"\s+", " ", LOCK_TAG.sub("", parts.get(k, ""))).strip().rstrip(".;,")
 
-    who, _, manner = get("NHÂN VẬT").partition(":")
+    who, _, identity = get("NHÂN VẬT").partition(":")
+    # Lặp NGUYÊN khối nhận diện (ngoại hình + trang phục) ở mọi cảnh để Flow không tự đổi mặt/trang phục
     out = [
         f"Tạo 1 video (không tạo hình ảnh) dọc 9:16, {duration_sec} giây, chuyển động tự nhiên, chân thực.",
-        f"Nhân vật: {who.strip() or 'Nhân vật'}, giữ nguyên khuôn mặt và trang phục theo nhân vật đã lưu trong dự án; "
-        f"thần thái {manner.split(';')[0].strip() or 'ấm áp, nhẹ nhàng'}.",
+        f"Nhân vật: {who.strip() or 'Nhân vật'} ({identity.strip() or 'ấm áp, nhẹ nhàng'}), giữ nguyên khuôn mặt, tóc, "
+        "kính và trang phục đúng như nhân vật đã lưu trong dự án.",
     ]
     sections = [("LOẠI CẢNH", "Kiểu cảnh"), ("HÀNH ĐỘNG", "Hành động"), ("BỐI CẢNH", "Bối cảnh"),
                 ("MÁY QUAY", "Máy quay"), ("ÁNH SÁNG", "Ánh sáng")]
@@ -67,6 +69,7 @@ def to_flow_prompt(prompt_text: str, duration_sec: int, speech_in_video: bool) -
                    else f"Khẩu hình nhân vật mấp máy theo câu (không phát thành tiếng): {dialogue}")
     if get("NEGATIVE PROMPT"):
         out.append(f"Tránh: {get('NEGATIVE PROMPT')}.")
+    out += [f"Lưu ý: {n.strip().rstrip('.')}." for n in NOTE.findall(prompt_text)]  # quy tắc của template A03
     if not parts:  # prompt tự do (không theo 9 mục)
         out = [out[0], prompt_text.strip()]
     out.append(NO_TEXT)

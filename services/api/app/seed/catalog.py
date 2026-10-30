@@ -75,6 +75,25 @@ CHANNELS = [
 BASE_NEGATIVE = ("chữ méo hoặc sai chính tả, logo sai, watermark, biến dạng tay/ngón tay, khuôn mặt thay đổi giữa các cảnh, "
                  "trang phục thay đổi so với Character Lock, mờ nhoè, nhấp nháy, nội dung bạo lực, sản phẩm thương hiệu "
                  "đối thủ, bao bì sữa công thức cho trẻ dưới 24 tháng, trẻ em trong tình huống nguy hiểm")
+# Chống "lộ AI" (CEO, 30/10/2026): da thật, ánh sáng điện thoại đời thường, chữ trên lon sữa không cần đọc được
+REALISM_NEGATIVE = ("da mịn như nhựa/da búp bê, ánh sáng studio quá hoàn hảo, tên thương hiệu đọc được trên lon sữa "
+                    "(readable brand names), chữ trên bao bì")
+
+# Quy tắc A02 — thoại kiểu nói chuyện thật, đúng vai tư vấn viên, đúng sản phẩm được phép
+SCRIPT_RULES = [
+    "Thoại viết như nói thật, giọng miền Nam: câu ngắn, có từ đệm 'nè', 'á', 'nha', có chỗ ngập ngừng '…'. "
+    "Ví dụ: 'Hồi bé nhà chị cũng biếng ăn dữ lắm á… mấy mẹ đừng lo quá nha.'",
+    "Nhân vật là tư vấn viên / đại diện thương hiệu Ánh Ngân đang tư vấn — KHÔNG đóng vai khách hàng mua thật đang review.",
+    "Sản phẩm chỉ là sữa cho trẻ trên 24 tháng, sữa pha sẵn hoặc đồ dùng; hoặc nội dung kiến thức nuôi con không gắn sản phẩm.",
+]
+# Quy tắc A03 — lặp nguyên khối nhận diện nhân vật mỗi cảnh + 3 yếu tố "không lộ AI"
+SCENE_RULES = [
+    "Giữ nguyên khối nhận diện nhân vật (khuôn mặt, tóc, kính, trang phục) giống hệt ở mọi cảnh.",
+    "Chân thực như quay bằng điện thoại: da có khuyết điểm thật (lỗ chân lông, nếp nhăn nhẹ), ánh sáng đời thường "
+    "trong cửa hàng, máy cầm tay hơi rung nhẹ.",
+    "Nhân vật là tư vấn viên / đại diện thương hiệu đang tư vấn, không phải khách hàng đang review.",
+    "Chữ và logo trên bao bì không cần đọc được — logo thật được chèn ở bước dựng.",
+]
 
 PROMPT_TEMPLATES = [
     {
@@ -93,7 +112,7 @@ PROMPT_TEMPLATES = [
             "- Tiếng Việt có dấu đầy đủ, tự nhiên, gần gũi.\n"
             "{% for r in rules %}- {{ r }}\n{% endfor %}"
         ),
-        "negative_prompt": "",
+        "negative_prompt": "", "rules": SCRIPT_RULES,
     },
     {
         "code": "A03.scene_prompt", "name": "Prompt cảnh 9 phần", "agent_code": "A03",
@@ -111,7 +130,7 @@ PROMPT_TEMPLATES = [
             "Định dạng: video dọc {{ aspect_ratio }}, {{ duration }} giây, 1080x1920, chuyển động tự nhiên."
             "{% for r in rules %}\nLưu ý: {{ r }}{% endfor %}"
         ),
-        "negative_prompt": BASE_NEGATIVE,
+        "negative_prompt": BASE_NEGATIVE + ", " + REALISM_NEGATIVE, "rules": SCENE_RULES,
     },
     {
         "code": "A08.rca", "name": "Phân tích nguyên nhân gốc (5 Whys)", "agent_code": "A08",

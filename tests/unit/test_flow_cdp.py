@@ -9,14 +9,16 @@ from app.providers.video.flow_cdp import FlowCDPProvider, to_flow_prompt
 
 PROMPT = ("[1. LOẠI CẢNH] Talking Head\n[2. NHÂN VẬT] Mẹ Ánh Ngân [Character Lock CHR-2610-0003 v2]: ấm áp; đeo kính\n"
           "[3. HÀNH ĐỘNG] Mẹ Ánh Ngân chào khách\n[8. THOẠI] Chào cả nhà / hôm nay mình nói về sữa\n"
-          "[9. NEGATIVE PROMPT] logo sai, chữ méo")
+          "[9. NEGATIVE PROMPT] logo sai, chữ méo\nĐịnh dạng: video dọc 9:16, 8 giây\nLưu ý: da có khuyết điểm thật.")
 MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 20000
 
 
 def test_prompt_one_paragraph_without_lock_tags():
     p = to_flow_prompt(PROMPT, 8, speech_in_video=False)
     assert p.startswith("Tạo 1 video (không tạo hình ảnh) dọc 9:16, 8 giây")
-    assert "Nhân vật: Mẹ Ánh Ngân," in p and "thần thái ấm áp" in p and "CHR-" not in p and "Character Lock" not in p
+    # nguyên khối nhận diện được lặp lại ở mọi cảnh, bỏ mã khoá; quy tắc "Lưu ý" của template đi kèm
+    assert "Nhân vật: Mẹ Ánh Ngân (ấm áp; đeo kính)," in p and "CHR-" not in p and "Character Lock" not in p
+    assert "Lưu ý: da có khuyết điểm thật." in p and "Định dạng" not in p
     # Flow chỉ tạo hình: khẩu hình theo thoại nhưng không phát tiếng, bỏ mục âm thanh "giọng thoại rõ"
     assert "không phát thành tiếng): Chào cả nhà hôm nay mình nói về sữa" in p and "Tránh: logo sai, chữ méo." in p
     assert "Lời thoại:" not in p and "Âm thanh:" not in p

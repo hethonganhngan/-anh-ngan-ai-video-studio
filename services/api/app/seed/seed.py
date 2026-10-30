@@ -110,7 +110,7 @@ def seed_prompts(db: Session) -> None:
         db.add(tpl)
         db.flush()
         v = PromptVersion(template_id=tpl.id, version_no=1, content=t["content"], negative_prompt=t["negative_prompt"],
-                          status="APPROVED", data_mode="PRODUCTION", change_note="Phiên bản chuẩn khởi tạo")
+                          rules=t.get("rules", []), status="APPROVED", data_mode="PRODUCTION", change_note="Phiên bản chuẩn khởi tạo")
         db.add(v)
         db.flush()
         tpl.active_version_id = v.id
