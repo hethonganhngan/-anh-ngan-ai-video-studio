@@ -44,7 +44,12 @@ function Edit({ p, onClose }: { p: Provider; onClose: () => void }) {
           <Field label="Cấu hình (JSON, KHÔNG chứa secret)" error={parsed ? undefined : "JSON không hợp lệ"}>
             <Textarea rows={8} className="font-mono text-xs" value={config} onChange={(e) => setConfig(e.target.value)} data-testid="prov-config" />
           </Field>
-          {p.connection_status !== "BUILTIN" && (
+          {p.config.adapter === "flow_cdp" && (
+            <p className="rounded-md bg-amber-50 p-2 text-sm text-amber-800" data-testid="prov-flow-cdp-note">
+              Không cần API key: chạy <code>scripts\windows\start-flow-chrome.ps1</code>, đăng nhập Flow trong cửa sổ Chrome đó, rồi bấm “Kiểm tra”.
+            </p>
+          )}
+          {p.connection_status !== "BUILTIN" && p.config.adapter !== "flow_cdp" && (
             <Field label={`API key ${p.secret_last4 ? `(hiện tại: ****${p.secret_last4})` : "(chưa có)"}`} hint="Để trống nếu không đổi. Key được mã hoá, không bao giờ hiển thị lại đầy đủ.">
               <Input type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} data-testid="prov-key" />
             </Field>

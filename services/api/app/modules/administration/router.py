@@ -233,7 +233,15 @@ def test_provider(pid: uuid.UUID, ctx: Ctx = Depends(require("admin.providers"))
     if acc.connection_status == "BUILTIN":
         return acc
     key = decrypt_secret(acc.secret_encrypted) if acc.secret_encrypted else None
-    if not key:
+    if (acc.config or {}).get("adapter") == "flow_cdp":
+        from app.providers.video.registry import build_real_provider
+
+        try:
+            build_real_provider(acc, None).test_connection()
+            acc.connection_status, acc.last_error, acc.last_verified_at = "VERIFIED", None, datetime.now(timezone.utc)
+        except Exception as e:  # noqa: BLE001
+            acc.connection_status, acc.last_error = "ERROR", str(e)[:500]
+    elif not key:
         acc.connection_status = "NOT_CONFIGURED"
         acc.last_error = "Chưa có API key"
     elif acc.provider_code == "anthropic":

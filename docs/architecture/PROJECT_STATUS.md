@@ -15,6 +15,8 @@
 
 - **Chế độ AUTO trọn gói (2026-10-30, D19/D20):** M02 nhập chủ đề → A01 viết kịch bản → tự duyệt nếu sạch (vi phạm CRITICAL thì dừng) → Veo trên Vertex AI tạo cảnh (ảnh Character Lock làm tham chiếu, cấm chữ/logo, không tiếng nói) → QC kỹ thuật → tự lồng giọng Voice Profile M04 → dựng có logo + phụ đề → dừng ở FINAL_QC. M05 có nút "Tạo trên Flow" (sao prompt + mở Google Flow) và đổi nhà cung cấp video của dự án.
 
+- **Flow tự động qua Chrome CDP (2026-10-30, D21, thử nghiệm):** provider `flow_cdp` (0đ, dùng lượt gói Google). Chạy `scripts/windows/start-flow-chrome.ps1`, đăng nhập Flow 1 lần, M15 → bật + Kiểm tra. M02 tự chọn provider thật rẻ nhất. Chạy thật PRJ-2610-0011: gửi prompt OK; Flow phát video bằng canvas (không có `<video>`) → nhận diện qua trang `/edit/…`/ảnh thu nhỏ mới, tải bằng "Tải xuống → 720p Kích thước gốc" (đã kiểm chứng tải tay 720×1280 8s, nhập → dựng → FINAL_QC). Cần Playwright ≥1.64 (bản cũ treo khi Chrome có tiện ích). Luồng tự tải trọn vẹn chờ lần chạy kế tiếp xác nhận. Flow gắn hình mờ ✦ góc phải dưới.
+
 ## Kiểm thử (lần chạy cuối 2026-10-29)
 | Bộ | Kết quả |
 |---|---|

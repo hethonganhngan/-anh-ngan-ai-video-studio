@@ -137,6 +137,15 @@ VEO_VERTEX_CONFIG = {
             "logo/phụ đề ghép ở M06. Giá Veo 3.1 Fast ~0,10–0,15 USD/giây (tham khảo, kiểm tra bảng giá Google).",
 }
 
+FLOW_CDP_CONFIG = {
+    "adapter": "flow_cdp", "cdp_url": "http://127.0.0.1:9222",
+    "project_url": "https://flow.google.com/project/6ae396ef-7905-495b-90b1-564042d940cd",
+    "timeout_min": 15, "speech_in_video": False, "max_duration_sec": 8, "supported_aspects": ["9:16", "16:9"],
+    "note": "THỬ NGHIỆM (D21): Playwright điều khiển Chrome đã đăng nhập Flow qua CDP, dùng lượt của gói Google — "
+            "không tốn phí API. Chạy scripts/windows/start-flow-chrome.ps1, đăng nhập Flow 1 lần trong cửa sổ đó, "
+            "bấm 'Kiểm tra'. Rủi ro: Google có thể hạn chế tài khoản vì truy cập tự động.",
+}
+
 PROVIDERS = [
     {"provider_type": "VIDEO", "provider_code": "mock", "name": "Mock Video Provider (DEMO)", "is_enabled": True,
      "connection_status": "BUILTIN", "unit_cost": 1500, "cost_unit": "SECOND",
@@ -147,6 +156,9 @@ PROVIDERS = [
     {"provider_type": "VIDEO", "provider_code": "veo_vertex", "name": "Google Veo (Vertex AI) — API chính thức",
      "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 3900, "cost_unit": "SECOND",
      "config": VEO_VERTEX_CONFIG},
+    {"provider_type": "VIDEO", "provider_code": "flow_cdp", "name": "Google Flow tự động (Chrome CDP, thử nghiệm)",
+     "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "SECOND",
+     "config": FLOW_CDP_CONFIG},
     {"provider_type": "VIDEO", "provider_code": "gemini_omni", "name": "Google Gemini Omni Flash — tạo video AI",
      "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 2600, "cost_unit": "SECOND",
      "config": {"adapter": "gemini_omni", "model": "gemini-omni-1.1-flash", "resolution": "720p", "background": True,

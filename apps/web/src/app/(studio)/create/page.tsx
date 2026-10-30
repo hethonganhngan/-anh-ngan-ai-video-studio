@@ -77,7 +77,9 @@ export default function CreatePage() {
   useEffect(() => {
     // Mặc định "nhập chủ đề là chạy": ưu tiên provider API thật đã sẵn sàng (tạo tự động), không thì provider khả dụng đầu tiên
     if (providers.data && !availableProviders.some((p) => p.code === w.video_provider_code)) {
-      const pick = availableProviders.find((p) => p.is_real) ?? availableProviders[0];
+      // nhiều provider thật → chọn rẻ nhất (vd. Flow tự động dùng lượt gói Google, 0đ)
+      const real = availableProviders.filter((p) => p.is_real).sort((a, b) => a.unit_cost_vnd_per_sec - b.unit_cost_vnd_per_sec);
+      const pick = real[0] ?? availableProviders[0];
       if (pick) setValue("video_provider_code", pick.code);
     }
   }, [providers.data, availableProviders, w.video_provider_code, setValue]);

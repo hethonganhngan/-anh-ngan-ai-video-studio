@@ -1,0 +1,180 @@
+"""Flow tự động qua CDP (D21): dựng prompt, luồng gửi → chờ video mới → tải, các nhánh chờ thủ công — trình duyệt giả lập."""
+import sys
+import types
+
+import pytest
+from app.providers.video import flow_cdp as F
+from app.providers.video.base import GenerationSpec, ProviderError
+from app.providers.video.flow_cdp import FlowCDPProvider, to_flow_prompt
+
+PROMPT = ("[1. LOẠI CẢNH] Talking Head\n[2. NHÂN VẬT] Mẹ Ánh Ngân [Character Lock CHR-2610-0003 v2]: ấm áp; đeo kính\n"
+          "[3. HÀNH ĐỘNG] Mẹ Ánh Ngân chào khách\n[8. THOẠI] Chào cả nhà / hôm nay mình nói về sữa\n"
+          "[9. NEGATIVE PROMPT] logo sai, chữ méo")
+MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 20000
+
+
+def test_prompt_one_paragraph_without_lock_tags():
+    p = to_flow_prompt(PROMPT, 8, speech_in_video=False)
+    assert p.startswith("Tạo 1 video (không tạo hình ảnh) dọc 9:16, 8 giây")
+    assert "Nhân vật: Mẹ Ánh Ngân," in p and "thần thái ấm áp" in p and "CHR-" not in p and "Character Lock" not in p
+    assert "Lời thoại: Chào cả nhà hôm nay mình nói về sữa" in p and "Tránh: logo sai, chữ méo." in p
+    assert F.NO_TEXT in p and F.SILENT_SPEECH in p and "\n" not in p
+    assert F.SILENT_SPEECH not in to_flow_prompt(PROMPT, 8, speech_in_video=True)
+
+
+def test_status_and_result_from_job_id():
+    p = FlowCDPProvider("flow_cdp", "Flow", {})
+    assert p.unit_cost_vnd_per_sec == 0 and p.estimate_cost(GenerationSpec(job_ref="j", prompt_text="x")) == 0
+    assert p.get_status(F.OK + "C:/tmp/a.mp4").state == "SUCCEEDED" and p.get_result(F.OK + "C:/tmp/a.mp4") == "C:/tmp/a.mp4"
+    st = p.get_status(F.MANUAL + "Flow yêu cầu đăng nhập")
+    assert st.state == "NEEDS_MANUAL_ACTION" and st.error_message == "Flow yêu cầu đăng nhập"
+    with pytest.raises(ProviderError):
+        p.get_result(F.MANUAL + "x")
+
+
+def test_cdp_only_localhost():
+    with pytest.raises(ProviderError) as e:
+        FlowCDPProvider("flow_cdp", "Flow", {"cdp_url": "http://10.0.0.5:9222"})._connect(object())
+    assert e.value.code == "BAD_URL"
+
+
+OLD = "https://flow-content.google/image/11111111-1111-1111-1111-111111111111"
+NEW = "https://flow-content.google/image/22222222-2222-2222-2222-222222222222"
+EDIT = F.DEFAULT_PROJECT + "/edit/33333333-3333-3333-3333-333333333333"
+
+
+class FakeLocator:
+    """Đủ dùng cho get_by_role/locator/filter/first của Playwright trong luồng Flow."""
+
+    def __init__(self, page, kind, name=None, text=None):
+        self.p, self.kind, self.name, self.text = page, kind, name, text
+
+    @property
+    def first(self):
+        return self
+
+    def _items(self):
+        s = self.p.s
+        if self.kind == "menuitem":
+            items = ["720p / Kích thước gốc", "1080p / Đã tăng độ phân giải"] if s["menu"] else []
+            return [i for i in items if self.text is None or self.text.search(i)]
+        if self.kind == "button" and self.name == F.DOWNLOAD_BUTTON:
+            return ["download"] if EDIT_ID_RE.search(self.p.url) else []
+        return ["x"]
+
+    def count(self):
+        return len(self._items())
+
+    def filter(self, has_text):
+        return FakeLocator(self.p, self.kind, self.name, has_text)
+
+    def wait_for(self, **_):
+        if self.kind == "textbox" and self.p.s.get("redirect"):
+            raise TimeoutError
+        if not self._items():
+            raise TimeoutError
+
+    def fill(self, text):
+        self.p.s["filled"] = text
+
+    def click(self):
+        s = self.p.s
+        if self.kind == "button" and self.name == F.SUBMIT_BUTTON:
+            assert s["filled"]
+            s["clicked"] = True
+        elif self.kind == "button" and self.name == F.DOWNLOAD_BUTTON:
+            s["menu"] = s["ready"]
+        elif self.kind == "img":
+            self.p.url = EDIT
+        elif self.kind == "menuitem":
+            s["downloads"].append(self.text.pattern)
+
+
+class FakePage:
+    def __init__(self, state):
+        self.s, self.url = state, F.DEFAULT_PROJECT
+        self.keyboard = types.SimpleNamespace(press=lambda k: state.update(menu=False))
+
+    def goto(self, url, **_):
+        self.url = self.s.get("redirect", url)
+
+    def get_by_role(self, role, name=None):
+        return FakeLocator(self, role, name)
+
+    def locator(self, sel):
+        return FakeLocator(self, "img" if sel.startswith("img") else "other")
+
+    def wait_for_url(self, pattern, **_):
+        assert pattern.search(self.url)
+
+    def wait_for_timeout(self, _):
+        s = self.s
+        s["ticks"] += 1
+        if s["clicked"] and s["ticks"] >= s["ready_at"]:
+            s["ready"] = True
+            s["thumbs"] = [NEW, *[t for t in s["thumbs"] if t != NEW]]
+
+    def evaluate(self, js, *_):
+        return list(self.s["thumbs"])
+
+    def expect_download(self, **_):
+        s = self.s
+
+        class Ctx:
+            def __enter__(self_inner):
+                return types.SimpleNamespace(value=types.SimpleNamespace(
+                    suggested_filename="Mẹ_tư_vấn_chọn_sữa_22222222.mp4",
+                    save_as=lambda path: open(path, "wb").write(MP4)))
+
+            def __exit__(self_inner, *a):
+                return False
+
+        s["expected_download"] = True
+        return Ctx()
+
+    def close(self):
+        self.s["closed"] = True
+
+
+EDIT_ID_RE = F.EDIT_ID
+
+
+@pytest.fixture
+def fake_chrome(monkeypatch):
+    s = {"thumbs": [OLD], "ticks": 0, "ready_at": 3, "ready": False, "clicked": False, "menu": False,
+         "filled": None, "closed": False, "downloads": []}
+    ctx = types.SimpleNamespace(new_page=lambda: FakePage(s))
+    browser = types.SimpleNamespace(contexts=[ctx])
+
+    class PW:
+        chromium = types.SimpleNamespace(connect_over_cdp=lambda url, timeout: browser)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", types.SimpleNamespace(sync_playwright=PW))
+    return s
+
+
+def test_generate_opens_new_item_and_downloads_original_720p(fake_chrome):
+    job_id = FlowCDPProvider("flow_cdp", "Flow", {})._generate(GenerationSpec(job_ref="j", prompt_text=PROMPT))
+    assert job_id.startswith(F.OK) and fake_chrome["closed"]
+    assert fake_chrome["downloads"] == [F.QUALITY.pattern]  # chọn bản gốc 720p, không phải bản tăng độ phân giải
+    with open(job_id[len(F.OK):], "rb") as f:
+        assert f.read() == MP4
+    assert "Mẹ Ánh Ngân chào khách" in fake_chrome["filled"]
+
+
+def test_timeout_needs_manual_without_resubmit(fake_chrome):
+    fake_chrome["ready_at"] = 10**6
+    job_id = FlowCDPProvider("flow_cdp", "Flow", {"timeout_min": 0})._generate(GenerationSpec(job_ref="j", prompt_text=PROMPT))
+    assert job_id.startswith(F.MANUAL) and "không tự gửi lại" in job_id and fake_chrome["clicked"]
+
+
+def test_login_page_needs_manual_and_nothing_submitted(fake_chrome):
+    fake_chrome["redirect"] = "https://accounts.google.com/v3/signin"
+    job_id = FlowCDPProvider("flow_cdp", "Flow", {})._generate(GenerationSpec(job_ref="j", prompt_text=PROMPT))
+    assert job_id.startswith(F.MANUAL) and "đăng nhập" in job_id and not fake_chrome["clicked"]
