@@ -29,6 +29,20 @@ def get_video_provider(db: Session, code: str, mode: str) -> VideoProvider:
     if not acc.is_enabled:
         raise ProviderUnavailable(f"Nhà cung cấp {acc.name} đang tắt")
     key = decrypt_secret(acc.secret_encrypted) if acc.secret_encrypted else None
+    return build_real_provider(acc, key)
+
+
+def build_real_provider(acc: ProviderAccount, key: str | None) -> VideoProvider:
+    if (acc.config or {}).get("adapter") == "gemini_omni":
+        from app.providers.video.gemini_omni import GeminiOmniProvider
+
+        return GeminiOmniProvider(code=acc.provider_code, name=acc.name, api_key=key, config=acc.config,
+                                  unit_cost_vnd_per_sec=acc.unit_cost)
+    if (acc.config or {}).get("adapter") == "veo_vertex":
+        from app.providers.video.veo_vertex import VeoVertexProvider
+
+        return VeoVertexProvider(code=acc.provider_code, name=acc.name, api_key=key, config=acc.config,
+                                 unit_cost_vnd_per_sec=acc.unit_cost)
     return RealAPIProvider(code=acc.provider_code, name=acc.name, api_key=key, config=acc.config)
 
 
@@ -45,5 +59,6 @@ def list_video_providers(db: Session, mode: str) -> list[dict]:
         out.append({"code": acc.provider_code, "name": acc.name, "kind": "REAL_API", "is_real": True,
                     "available": mode == "PRODUCTION" and acc.is_enabled and bool(acc.secret_encrypted),
                     "connection_status": acc.connection_status, "unit_cost_vnd_per_sec": float(acc.unit_cost),
-                    "max_duration_sec": acc.config.get("max_duration_sec", 8)})
+                    "max_duration_sec": acc.config.get("max_duration_sec", 8),
+                    "supported_aspects": acc.config.get("supported_aspects", ["9:16"])})
     return out

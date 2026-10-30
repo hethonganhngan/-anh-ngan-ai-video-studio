@@ -96,9 +96,17 @@ def validate_assets(ctx: Ctx, project_id) -> dict:
     return report
 
 
-def _attempts_for_scene_version(ctx: Ctx, scene: Scene) -> int:
+def _voided_manual_count(ctx: Ctx, scene: Scene) -> int:
+    """Tác vụ chờ nhập Flow đã huỷ (vd. do đổi nhà cung cấp): không tốn phí, không tính vào giới hạn lần tạo."""
     return ctx.db.scalar(select(func.count()).select_from(GenerationJob).where(
+        GenerationJob.scene_id == scene.id, GenerationJob.scene_version_no == scene.current_version_no,
+        GenerationJob.provider_code == "manual_flow", GenerationJob.status == "CANCELLED")) or 0
+
+
+def _attempts_for_scene_version(ctx: Ctx, scene: Scene) -> int:
+    total = ctx.db.scalar(select(func.count()).select_from(GenerationJob).where(
         GenerationJob.scene_id == scene.id, GenerationJob.scene_version_no == scene.current_version_no)) or 0
+    return total - _voided_manual_count(ctx, scene)
 
 
 def _new_job(ctx: Ctx, p: Project, scene: Scene, provider, *, manual_retry: bool = False) -> GenerationJob:
@@ -117,12 +125,15 @@ def _new_job(ctx: Ctx, p: Project, scene: Scene, provider, *, manual_retry: bool
     spec = GenerationSpec(job_ref=str(scene.id), prompt_text=scene.prompt_text, duration_sec=scene.duration_sec,
                           aspect_ratio=p.aspect_ratio)
     est = provider.estimate_cost(spec)
+    # Số lần đánh lại sau khi bỏ tác vụ Flow đã huỷ → thêm tiền tố x<n> để khoá idempotency không trùng bản cũ
+    voided = _voided_manual_count(ctx, scene)
+    key_base = f"{scene.id}:v{scene.current_version_no}" + (f":x{voided}" if voided else "")
     job = GenerationJob(
         project_id=p.id, scene_id=scene.id, scene_version_no=scene.current_version_no, provider_code=provider.code,
         status="QUEUED", attempt_no=attempts + 1, max_retries=max_retries, estimated_cost=est,
         prompt_snapshot={"prompt_text": scene.prompt_text, "negative_prompt": scene.negative_prompt,
                          "prompt_parts": scene.prompt_parts, "prompt_version_id": str(scene.prompt_version_id) if scene.prompt_version_id else None},
-        idempotency_key=f"{scene.id}:v{scene.current_version_no}:a{attempts + 1}", requested_by=ctx.actor.user_uuid,
+        idempotency_key=f"{key_base}:a{attempts + 1}", requested_by=ctx.actor.user_uuid,
         data_mode=ctx.mode, log=[{"msg": "Thủ công tạo lại" if manual_retry else "Xếp hàng"}],
     )
     ctx.db.add(job)

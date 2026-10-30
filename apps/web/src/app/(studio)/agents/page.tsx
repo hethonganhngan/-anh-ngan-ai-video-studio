@@ -31,7 +31,7 @@ type Exec = {
   output_tokens: number; cost: string; is_simulated: boolean; latency_ms: number; status: string; error: string | null;
   triggered_by: string | null; started_at: string; finished_at: string | null;
 };
-const MODELS: Record<string, string[]> = { "mock-llm": ["mock-deterministic-v1"], anthropic: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"] };
+const MODELS: Record<string, string[]> = { "mock-llm": ["mock-deterministic-v1"], anthropic: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"], gemini: ["gemini-3.8-flash", "gemini-4-argon", "gemini-3.5-flash-lite"] };
 const EXEC_STATUS: Record<string, "green" | "red" | "purple" | "gray"> = { SUCCEEDED: "green", FAILED: "red", RUNNING: "purple", REJECTED: "gray" };
 
 function ConfigDialog({ a, onClose }: { a: Agent; onClose: () => void }) {

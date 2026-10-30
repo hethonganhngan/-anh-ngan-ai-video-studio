@@ -15,6 +15,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from app.core.config import get_settings
+from app.modules.rendering.ffmpeg import filter_path
 from app.providers.video.base import GenerationSpec, ProviderError, ProviderStatus, VideoProvider
 
 PALETTE = ["0x1E3A8A", "0x0F766E", "0x7C2D12", "0x4C1D95", "0x065F46", "0x9D174D", "0x1E40AF", "0x854D0E"]
@@ -70,7 +71,8 @@ class MockVideoProvider(VideoProvider):
             Path(t1).write_text(title, encoding="utf-8")
             Path(t2).write_text("\n".join(_wrap(x, 28) for x in lines) or " ", encoding="utf-8")
             Path(t3).write_text("DEMO · MOCK PROVIDER", encoding="utf-8")
-            font = s.font_file
+            font = filter_path(s.font_file)
+            t1, t2, t3 = filter_path(t1), filter_path(t2), filter_path(t3)
             vf = (
                 f"drawtext=fontfile={font}:textfile={t3}:fontcolor=white@0.7:fontsize={fs_body}:x=(w-tw)/2:y=h*0.06,"
                 f"drawtext=fontfile={font}:textfile={t1}:fontcolor=white:fontsize={fs_title}:x=(w-tw)/2:y=h*0.35,"

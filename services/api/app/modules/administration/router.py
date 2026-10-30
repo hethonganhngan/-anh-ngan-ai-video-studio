@@ -246,6 +246,24 @@ def test_provider(pid: uuid.UUID, ctx: Ctx = Depends(require("admin.providers"))
             acc.connection_status, acc.last_error, acc.last_verified_at = "VERIFIED", None, datetime.now(timezone.utc)
         except Exception as e:  # noqa: BLE001
             acc.connection_status, acc.last_error = "ERROR", str(e)[:500]
+    elif (acc.config or {}).get("adapter") in ("gemini_omni", "veo_vertex", "gemini_tts", "gemini_llm"):
+        # Đọc thông tin model — không tạo nội dung nên không phát sinh chi phí
+        try:
+            if acc.config["adapter"] in ("gemini_omni", "veo_vertex"):
+                from app.providers.video.registry import build_real_provider
+
+                build_real_provider(acc, key).test_connection()
+            elif acc.config["adapter"] == "gemini_llm":
+                from app.providers.llm.gemini_provider import GeminiLLMProvider
+
+                GeminiLLMProvider(api_key=key, config=acc.config).test_connection()
+            else:
+                from app.providers.tts.gemini_tts import GeminiTTSProvider
+
+                GeminiTTSProvider(api_key=key, config=acc.config).test_connection()
+            acc.connection_status, acc.last_error, acc.last_verified_at = "VERIFIED", None, datetime.now(timezone.utc)
+        except Exception as e:  # noqa: BLE001
+            acc.connection_status, acc.last_error = "ERROR", str(e)[:500]
     else:
         acc.connection_status = "CONFIGURED_UNVERIFIED"
         acc.last_error = "Chưa có bài kiểm tra tự động cho nhà cung cấp này — cần xác minh thủ công với tài khoản thật"

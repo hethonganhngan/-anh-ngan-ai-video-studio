@@ -53,6 +53,33 @@ def poll_generation_job(job_id: str) -> str:
     return run_generation_job(job_id)
 
 
+REF_ORDER = ("FRONT", "THREE_QUARTER", "OUTFIT", "FULL_BODY", "EXPRESSION")
+
+
+def _reference_images(db, project, scene) -> list[str]:
+    """Ảnh tham chiếu từ Character Lock đã duyệt (M04) của nhân vật trong cảnh → provider giữ mặt/trang phục đồng nhất.
+    Chỉ khi cảnh có đúng 1 nhân vật (ảnh 'asset' của Veo mô tả 1 chủ thể); tối đa 3 ảnh, ưu tiên mặt chính diện."""
+    from app.media.models import Asset
+    from app.media.storage import get_storage
+    from app.modules.characters.models import Character, CharacterLock
+
+    ids = scene.character_ids or project.character_ids or []
+    if len(ids) != 1:
+        return []
+    c = db.get(Character, ids[0])
+    lock = db.get(CharacterLock, c.active_lock_id) if c and c.active_lock_id else None
+    if lock is None:
+        return []
+    refs = (lock.lock_data or {}).get("references") or {}
+    paths = []
+    for ref_type in sorted(refs, key=lambda t: REF_ORDER.index(t) if t in REF_ORDER else len(REF_ORDER)):
+        asset = db.get(Asset, (refs[ref_type] or {}).get("asset_id"))
+        path = get_storage().local_path(asset.storage_key) if asset else None
+        if path and os.path.exists(path):
+            paths.append(path)
+    return paths[:3]
+
+
 def _process_generation(db, job) -> str:
     from app.agents.runner import run_agent
     from app.modules.administration import service as admin
@@ -86,7 +113,8 @@ def _process_generation(db, job) -> str:
         spec = GenerationSpec(job_ref=str(job.id), prompt_text=job.prompt_snapshot.get("prompt_text", ""),
                               negative_prompt=job.prompt_snapshot.get("negative_prompt", ""),
                               duration_sec=scene.duration_sec, aspect_ratio=project.aspect_ratio,
-                              scene_title=scene.title, dialogue=scene.dialogue, attempt_no=job.attempt_no)
+                              scene_title=scene.title, dialogue=scene.dialogue, attempt_no=job.attempt_no,
+                              reference_image_paths=_reference_images(db, project, scene))
         issues = provider.validate_capabilities(spec)
         if issues:
             return _generation_failed(ctx, job, scene, project, "CAPABILITY", "; ".join(issues), retryable=False)
@@ -196,6 +224,19 @@ def _generation_failed(ctx: Ctx, job, scene, project, code: str, message: str, r
     return job.status
 
 
+def _auto_voiceover(ctx: Ctx, project) -> None:
+    """AUTO: lồng thoại bằng giọng Voice Profile (M04) của dự án trước khi dựng. Lỗi không chặn dựng
+    (video vẫn có phụ đề) — ghi vào last_error để người dùng biết và tạo lại giọng ở M06."""
+    from app.modules.rendering.voiceover import generate_voiceover
+
+    try:
+        with ctx.db.begin_nested():
+            generate_voiceover(ctx, project.id, actor_check=False)
+    except AppError as e:
+        project.last_error = f"Lồng tiếng tự động lỗi: {e.message}"[:2000]
+        log.warning("auto voiceover %s: %s", project.code, e.message)
+
+
 def _after_scene_change(ctx: Ctx, project) -> None:
     """Tổng hợp trạng thái cảnh → chuyển trạng thái dự án."""
     from app.modules.generation.models import GenerationJob
@@ -228,6 +269,8 @@ def _after_scene_change(ctx: Ctx, project) -> None:
             if result["all_passed"] and project.automation_level != "MANUAL":
                 from app.modules.rendering.service import start_render
 
+                if project.automation_level == "AUTO":
+                    _auto_voiceover(ctx, project)
                 start_render(ctx, project, timeline=None, actor_check=False)
         return
     if active:

@@ -20,7 +20,7 @@ class AnthropicProvider(LLMProvider):
     code = "anthropic"
     is_real = True
 
-    def __init__(self, api_key: str, model: str | None = None, timeout: float = 120.0):
+    def __init__(self, api_key: str, model: str | None = None, timeout: float = 600.0):
         import anthropic
 
         self._anthropic = anthropic

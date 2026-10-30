@@ -129,6 +129,14 @@ PROMPT_TEMPLATES = [
     },
 ]
 
+VEO_VERTEX_CONFIG = {
+    "adapter": "veo_vertex", "model": "veo-3.1-fast-generate-001", "location": "us-central1", "resolution": "720p",
+    "generate_audio": False, "speech_in_video": False, "max_duration_sec": 8, "supported_aspects": ["9:16", "16:9"],
+    "note": "Dùng được tín dụng dùng thử Google Cloud. Bật Vertex AI API, tạo service account (Vertex AI User) và "
+            "nạp file khoá JSON tại 'Sửa'. Gửi kèm ảnh Character Lock (M04); thoại do giọng M04 (TTS) lồng ở bước dựng, "
+            "logo/phụ đề ghép ở M06. Giá Veo 3.1 Fast ~0,10–0,15 USD/giây (tham khảo, kiểm tra bảng giá Google).",
+}
+
 PROVIDERS = [
     {"provider_type": "VIDEO", "provider_code": "mock", "name": "Mock Video Provider (DEMO)", "is_enabled": True,
      "connection_status": "BUILTIN", "unit_cost": 1500, "cost_unit": "SECOND",
@@ -137,9 +145,22 @@ PROVIDERS = [
      "connection_status": "BUILTIN", "unit_cost": 0, "cost_unit": "SECOND",
      "config": {"note": "Flow không có API công khai. Tạo cảnh trên Flow rồi tải lên tại M05."}},
     {"provider_type": "VIDEO", "provider_code": "veo_vertex", "name": "Google Veo (Vertex AI) — API chính thức",
-     "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "SECOND",
-     "config": {"note": "Cần Google Cloud project + quyền Vertex AI. Điền submit_url/status_url theo tài liệu chính thức.",
-                "max_duration_sec": 8, "supported_aspects": ["9:16", "16:9"]}},
+     "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 3900, "cost_unit": "SECOND",
+     "config": VEO_VERTEX_CONFIG},
+    {"provider_type": "VIDEO", "provider_code": "gemini_omni", "name": "Google Gemini Omni Flash — tạo video AI",
+     "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 2600, "cost_unit": "SECOND",
+     "config": {"adapter": "gemini_omni", "model": "gemini-omni-1.1-flash", "resolution": "720p", "background": True,
+                "speech_in_video": False, "max_duration_sec": 10, "supported_aspects": ["9:16", "16:9"],
+                "note": "Key lấy tại aistudio.google.com (bật thanh toán). Giá ~0,10 USD/giây 720p. "
+                        "Thoại tiếng Việt dùng Gemini TTS, video chỉ có âm thanh môi trường."}},
+    {"provider_type": "TTS", "provider_code": "gemini_tts", "name": "Google Gemini TTS — giọng đọc tiếng Việt",
+     "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 12, "cost_unit": "SECOND",
+     "config": {"adapter": "gemini_tts", "model": "gemini-3.8-flash-tts", "default_voice": "Kore", "style_prompt": True,
+                "note": "Dùng chung key Gemini. ~25 token/giây âm thanh; giá ~12 VND/giây (theo bảng giá 2027)."}},
+    {"provider_type": "LLM", "provider_code": "gemini_llm", "name": "Google Gemini — kịch bản & phân tích (A02/A08/A09)",
+     "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "TOKEN",
+     "config": {"adapter": "gemini_llm", "model": "gemini-3.8-flash", "thinking_level": "medium",
+                "note": "Dùng chung key Gemini. Chọn model cho từng agent tại M14 (provider 'gemini')."}},
     {"provider_type": "LLM", "provider_code": "anthropic", "name": "Anthropic Claude", "is_enabled": False,
      "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "TOKEN",
      "config": {"model": "claude-opus-5-5"}},

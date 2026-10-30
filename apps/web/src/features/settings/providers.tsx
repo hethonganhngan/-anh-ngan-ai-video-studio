@@ -27,6 +27,7 @@ const CONN: Record<string, { label: string; variant: BadgeVariant }> = {
 function Edit({ p, onClose }: { p: Provider; onClose: () => void }) {
   const [config, setConfig] = useState(JSON.stringify(p.config, null, 2));
   const [key, setKey] = useState("");
+  const [keyFile, setKeyFile] = useState("");
   const [cost, setCost] = useState(String(Number(p.unit_cost)));
   let parsed: Record<string, unknown> | null = null;
   try { parsed = JSON.parse(config); } catch { parsed = null; }
@@ -46,6 +47,12 @@ function Edit({ p, onClose }: { p: Provider; onClose: () => void }) {
           {p.connection_status !== "BUILTIN" && (
             <Field label={`API key ${p.secret_last4 ? `(hiện tại: ****${p.secret_last4})` : "(chưa có)"}`} hint="Để trống nếu không đổi. Key được mã hoá, không bao giờ hiển thị lại đầy đủ.">
               <Input type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} data-testid="prov-key" />
+            </Field>
+          )}
+          {p.config.adapter === "veo_vertex" && (
+            <Field label="Hoặc nạp file khoá service account (.json)" hint={keyFile ? `Đã đọc ${keyFile} — bấm Lưu để mã hoá & lưu` : "Google Cloud → IAM → Service accounts → Keys → Add key → JSON"}>
+              <Input type="file" accept="application/json,.json" data-testid="prov-key-file"
+                onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setKey((await f.text()).trim()); setKeyFile(f.name); } }} />
             </Field>
           )}
           <Field label={`Đơn giá (VND / ${p.cost_unit})`}><Input type="number" min={0} value={cost} onChange={(e) => setCost(e.target.value)} data-testid="prov-cost" /></Field>

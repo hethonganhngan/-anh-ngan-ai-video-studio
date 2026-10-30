@@ -249,7 +249,8 @@ def test_switch_manual_flow_to_auto_provider(login, channels):
     pm.post(f"/projects/{pid}/script/write")
     pm.post(f"/projects/{pid}/script/approve", json={})
     pm.post(f"/projects/{pid}/validate-assets")
-    pm.post(f"/projects/{pid}/generate", json={})
+    for _ in range(4):  # bấm "Tạo" nhiều lần với Flow → chạm giới hạn 4 lần/phiên bản
+        pm.post(f"/projects/{pid}/generate", json={})
     assert pm.get(f"/projects/{pid}").json()["status"] == "NEEDS_MANUAL_ACTION"
 
     # Provider chưa kết nối bị chặn

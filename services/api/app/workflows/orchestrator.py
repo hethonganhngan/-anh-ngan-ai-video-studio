@@ -1,7 +1,8 @@
 """A01 AI Director — điều phối workflow.
 
 Nguyên tắc: Agent chỉ chạy các bước tự động; dừng ở mọi cổng cần con người (duyệt kịch bản, QC tổng thể,
-phê duyệt phát hành, xuất bản). MANUAL: mỗi lần advance chạy 1 bước; ASSISTED/AUTO: chạy liên tiếp tới cổng kế."""
+phê duyệt phát hành, xuất bản). MANUAL: mỗi lần advance chạy 1 bước; ASSISTED/AUTO: chạy liên tiếp tới cổng kế.
+AUTO còn tự duyệt kịch bản sạch và tự lồng giọng M04 trước khi dựng → chạy một mạch tới FINAL_QC (video hoàn chỉnh)."""
 from app.agents.runner import run_agent
 from app.core.context import Ctx
 from app.core.errors import AppError, InvalidTransition, ValidationFailed
@@ -45,6 +46,11 @@ def _step(ctx: Ctx, p) -> str | None:
             return None  # MANUAL: chờ người chọn ý tưởng
         scripts.write_script(ctx, p.id)
         return "A02 viết kịch bản & storyboard"
+    if st == "SCRIPT_REVIEW" and p.automation_level == "AUTO":
+        # Chính sách AUTO (CEO chốt 2026-10-29, D19): duyệt thay người bấm khi kịch bản sạch. approve_script vẫn chặn
+        # lỗi storyboard và vi phạm tuân thủ CRITICAL (vd sữa cho trẻ < 24 tháng) → dừng ở cổng chờ người duyệt.
+        scripts.approve_script(ctx, p.id, comment="Tự duyệt (AUTO): không có lỗi hay vi phạm tuân thủ nghiêm trọng")
+        return "Tự duyệt kịch bản (AUTO)"
     if st == "STORYBOARD_READY":
         gen.validate_assets(ctx, p.id)
         return "A04 kiểm tra tài nguyên"

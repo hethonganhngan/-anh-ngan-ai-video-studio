@@ -101,6 +101,21 @@ def save_timeline(project_id: uuid.UUID, data: TimelineIn, ctx: Ctx = Depends(re
     return tl
 
 
+class VoiceoverIn(BaseModel):
+    voice_profile_id: uuid.UUID | None = None
+    scene_volume: float = Field(default=0.35, ge=0, le=1)
+
+
+@router.post("/projects/{project_id}/voiceover/generate")
+def generate_voiceover(project_id: uuid.UUID, data: VoiceoverIn, ctx: Ctx = Depends(require("editor.edit"))):
+    """Tạo voice-over AI từ lời thoại các cảnh và gắn vào timeline (DEMO: Mock TTS; PRODUCTION: TTS thật)."""
+    from app.modules.rendering.voiceover import generate_voiceover as gen
+
+    res = gen(ctx, project_id, voice_profile_id=data.voice_profile_id, scene_volume=data.scene_volume)
+    ctx.db.commit()
+    return res
+
+
 @router.post("/projects/{project_id}/timeline/reset")
 def reset_timeline(project_id: uuid.UUID, ctx: Ctx = Depends(require("editor.edit"))):
     from app.modules.projects.service import lock_project

@@ -103,6 +103,11 @@ def _esc_filter_path(p: str) -> str:
     return p.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'").replace(",", "\\,")
 
 
+def filter_path(p) -> str:
+    """Đường dẫn làm giá trị tuỳ chọn filter (fontfile, textfile): dùng '/', thoát ':' (ổ đĩa Windows), bọc nháy."""
+    return "'" + str(p).replace("\\", "/").replace(":", "\\:") + "'"
+
+
 def build_command(plan: RenderPlan) -> list[str]:
     s = get_settings()
     if not plan.clips:
@@ -205,7 +210,7 @@ def make_thumbnail(video: str, out_jpg: str, time_sec: float = 1.0, title: str |
         with open(tmp_txt, "w", encoding="utf-8") as f:
             f.write(_wrap(title, 22))
         vf += (f",drawbox=x=0:y=ih*0.70:w=iw:h=ih*0.18:color=black@0.55:t=fill,"
-               f"drawtext=fontfile={s.font_file}:textfile={tmp_txt}:fontcolor=white:fontsize=64:line_spacing=14:"
+               f"drawtext=fontfile={filter_path(s.font_file)}:textfile={filter_path(tmp_txt)}:fontcolor=white:fontsize=64:line_spacing=14:"
                f"x=(w-tw)/2:y=h*0.72")
     try:
         run([s.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{time_sec:.2f}", "-i", video,

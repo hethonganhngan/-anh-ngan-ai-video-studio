@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { JOB_STATUS, PROJECT_STATUS, SCENE_STATUS } from "@/lib/labels";
 import { formatDate, formatVND } from "@/lib/utils";
 import type { Asset, GenerationJob, Project, Scene } from "@/types/api";
-import { FlowImportDialog, SceneQCDialog } from "@/features/production/scene-dialogs";
+import { FlowCreateDialog, FlowImportDialog, SceneQCDialog } from "@/features/production/scene-dialogs";
 
 type Row = { scene: Scene; jobs: GenerationJob[]; outputs: Asset[]; attempts_this_version: number; cost_total: number };
 type Provider = { code: string; name: string; kind: string; is_real: boolean; available: boolean; connection_status: string; unit_cost_vnd_per_sec: number; max_duration_sec: number };
@@ -43,7 +43,7 @@ function Providers({ project, refresh }: { project?: Project; refresh: () => voi
         {(q.data ?? []).map((p) => (
           <div key={p.code} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-2 text-sm" data-testid={`provider-${p.code}`}>
             <span className="font-medium">{p.name} {p.code === current && <Badge variant="navy">Dự án dùng</Badge>}</span>
-            <span className="flex items-center gap-1">
+            <span className="flex flex-wrap items-center gap-1">
               <Badge variant={KIND[p.kind]?.variant ?? "gray"}>{KIND[p.kind]?.label ?? p.kind}</Badge>
               <Badge variant={p.available ? "green" : "gray"}>{p.available ? "Khả dụng" : "Không khả dụng"}</Badge>
               <Badge variant="gray">{p.connection_status}</Badge>
@@ -118,7 +118,10 @@ function SceneRow({ r, project, refresh }: { r: Row; project: Project; refresh: 
           {canProduce && (
             <div className="flex flex-wrap gap-2">
               <Can perm="generation.run"><Button size="sm" variant="outline" onClick={() => regen.mutate(undefined)} loading={regen.isPending} data-testid={`regen-${s.order_index}`}><RotateCcw />Tạo lại cảnh</Button></Can>
-              <Can perm="generation.import"><FlowImportDialog sceneId={s.id} sceneNo={n} onDone={refresh} /></Can>
+              <Can perm="generation.import">
+                <FlowCreateDialog sceneNo={n} promptText={s.prompt_text} durationSec={s.duration_sec} />
+                <FlowImportDialog sceneId={s.id} sceneNo={n} onDone={refresh} />
+              </Can>
               {["SCENE_QC", "FINAL_QC", "NEEDS_MANUAL_ACTION"].includes(project.status) && s.selected_asset_id && <Can perm="qc.review"><SceneQCDialog sceneId={s.id} sceneNo={n} onDone={refresh} /></Can>}
             </div>
           )}

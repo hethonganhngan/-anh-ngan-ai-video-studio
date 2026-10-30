@@ -87,7 +87,7 @@ export const PUB_STATUS: Record<string, { label: string; variant: BadgeVariant }
 export const SEVERITY: Record<string, BadgeVariant> = { CRITICAL: "red", MAJOR: "orange", MINOR: "yellow" };
 export const PRIORITY: Record<string, BadgeVariant> = { P0: "red", P1: "orange", P2: "yellow", P3: "gray" };
 export const PLATFORMS = ["FACEBOOK", "TIKTOK", "YOUTUBE", "ZALO"] as const;
-export const AUTOMATION: Record<string, string> = { MANUAL: "Thủ công (từng bước)", ASSISTED: "Hỗ trợ (AI chạy tới cổng duyệt)", AUTO: "Tự động tối đa" };
+export const AUTOMATION: Record<string, string> = { MANUAL: "Thủ công (từng bước)", ASSISTED: "Hỗ trợ (AI chạy tới cổng duyệt)", AUTO: "Tự động hoàn toàn (chủ đề → video hoàn chỉnh)" };
 export const ASSET_TYPES: Record<string, string> = {
   IMAGE: "Ảnh", VIDEO: "Video", AUDIO: "Âm thanh", LOGO: "Logo", CHARACTER: "Nhân vật", BACKGROUND: "Bối cảnh",
   PRODUCT: "Sản phẩm", TEMPLATE: "Template", REFERENCE: "File tham chiếu", SUBTITLE: "Phụ đề", DOCUMENT: "Tài liệu",
