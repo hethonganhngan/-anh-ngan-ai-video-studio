@@ -4,13 +4,17 @@ import subprocess
 import tempfile
 
 from app.core.config import get_settings
-from app.providers.tts.base import TTSProvider, TTSRequest, TTSResult
+from app.providers.tts.base import TTSProvider, TTSRequest, TTSResult, VoiceOption
 
 
 class MockTTSProvider(TTSProvider):
     code = "mock_tts"
     name = "Mock TTS (DEMO)"
     unit_cost_vnd_per_sec = 10.0
+
+    def voice_options(self) -> list[VoiceOption]:
+        return [VoiceOption("mock-nu-1", "female", "Nam"), VoiceOption("mock-nam-1", "male", "Nam"),
+                VoiceOption("mock-nu-2", "female", "Bắc"), VoiceOption("mock-nam-2", "male", "Bắc")]
 
     def synthesize(self, req: TTSRequest) -> TTSResult:
         dur = round(self.estimate_seconds(req.text), 2)

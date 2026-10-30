@@ -233,9 +233,33 @@ def test_provider(pid: uuid.UUID, ctx: Ctx = Depends(require("admin.providers"))
     if acc.connection_status == "BUILTIN":
         return acc
     key = decrypt_secret(acc.secret_encrypted) if acc.secret_encrypted else None
-    if not key:
+    if (acc.config or {}).get("adapter") in ("flow_cdp", "vieneu_local"):  # chạy trên máy, không cần key
+        try:
+            if acc.config["adapter"] == "flow_cdp":
+                from app.providers.video.registry import build_real_provider
+
+                build_real_provider(acc, None).test_connection()
+            else:
+                from app.providers.tts.vieneu_local import VieNeuLocalProvider
+
+                VieNeuLocalProvider(config=acc.config).test_connection()
+            acc.connection_status, acc.last_error, acc.last_verified_at = "VERIFIED", None, datetime.now(timezone.utc)
+        except Exception as e:  # noqa: BLE001
+            acc.connection_status, acc.last_error = "ERROR", str(e)[:500]
+    elif not key:
         acc.connection_status = "NOT_CONFIGURED"
         acc.last_error = "Chưa có API key"
+    elif acc.provider_code == "facebook_pages":  # đọc danh sách Fanpage — không đăng gì
+        try:
+            from app.modules.publishing import service as publishing
+            from app.providers.publishing.base import FacebookPagesPublisher
+
+            pages = FacebookPagesPublisher(key, acc.config, client=publishing._fb_http).pages()
+            if not pages:
+                raise ValueError("Token không quản lý Fanpage nào (cần quyền pages_manage_posts, pages_show_list)")
+            acc.connection_status, acc.last_error, acc.last_verified_at = "VERIFIED", None, datetime.now(timezone.utc)
+        except Exception as e:  # noqa: BLE001
+            acc.connection_status, acc.last_error = "ERROR", str(e)[:500]
     elif acc.provider_code == "anthropic":
         if ctx.mode != "PRODUCTION":
             raise ValidationFailed("Kiểm tra kết nối LLM thật chỉ chạy ở PRODUCTION MODE (tránh phát sinh chi phí ở DEMO)")

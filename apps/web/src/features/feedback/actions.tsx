@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { CATEGORY_LABEL, EVIDENCE_LABEL, type FeedbackDetail } from "./types";
+import { CATEGORY_LABEL, EVIDENCE_LABEL, type FeedbackDetail, type SimilarCase } from "./types";
 import { EvidenceEditor, cleanEv, emptyEv, type Ev } from "./evidence-editor";
 
 type Done = (d: FeedbackDetail) => void;
@@ -89,23 +89,42 @@ export function RcaForm({ id, onDone }: { id: string; onDone: Done }) {
   const [cls, setCls] = useState("HYPOTHESIS");
   const [conf, setConf] = useState("50");
   const [suggested, setSuggested] = useState(false);
+  const [similar, setSimilar] = useState<SimilarCase[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
   const { busy, err, run } = useCall(onDone);
   const suggest = async () => {
+    setSuggesting(true);
     try {
-      const r = await api<{ whys: { question: string; answer: string }[]; root_cause: string }>(`/feedback/${id}/rca/suggest`, { method: "POST" });
+      const r = await api<{ whys: { question: string; answer: string }[]; root_cause: string; confidence_pct: number; similar_cases: SimilarCase[] }>(
+        `/feedback/${id}/rca/suggest`, { method: "POST" });
       setWhys(Array.from({ length: 5 }, (_, i) => r.whys[i] ?? { question: `Tại sao ${i + 1}?`, answer: "" }));
-      setRc(r.root_cause); setCls("HYPOTHESIS"); setConf("40"); setSuggested(true);
+      setRc(r.root_cause); setCls("HYPOTHESIS"); setConf(String(Math.min(r.confidence_pct ?? 40, 69))); setSuggested(true);
+      setSimilar(r.similar_cases ?? []);
       toast.info("A08 đã gợi ý 5 Whys — đây là GIẢ THUYẾT, cần xác nhận bằng bằng chứng");
     } catch (e) { toast.error(errorMessage(e)); }
+    finally { setSuggesting(false); }
   };
   return (
     <Card data-testid="fb-rca">
       <CardHeader className="flex-row items-start justify-between">
         <div><CardTitle>Bước 4 — Nguyên nhân gốc (5 Whys)</CardTitle><CardDescription>Tối thiểu 3 câu trả lời. FACT yêu cầu mức chắc chắn ≥ 70%.</CardDescription></div>
-        <Button variant="outline" size="sm" onClick={suggest} data-testid="fb-rca-suggest"><Lightbulb />Gợi ý A08</Button>
+        <Button variant="outline" size="sm" loading={suggesting} onClick={suggest} data-testid="fb-rca-suggest"><Lightbulb />Gợi ý A08</Button>
       </CardHeader>
       <CardContent className="space-y-2">
         {suggested && <Badge variant="yellow" data-testid="fb-rca-hypothesis">HYPOTHESIS — gợi ý của A08, chưa phải kết luận</Badge>}
+        {similar.length > 0 && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-sm" data-testid="fb-rca-similar">
+            <p className="font-medium text-emerald-800">A08 học từ {similar.length} hồ sơ cùng loại đã kiểm chứng đạt:</p>
+            <ul className="ml-4 list-disc text-slate-700">
+              {similar.map((x) => (
+                <li key={x.id}>
+                  <a className="font-mono text-xs text-brand-600 hover:underline" href={`/feedback/${x.id}`} target="_blank" rel="noreferrer">{x.code}</a> {x.title} → <b>{x.root_cause}</b>
+                  {x.capa.length > 0 && <span className="text-xs text-slate-500"> · CAPA hiệu quả: {x.capa.join("; ")}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {whys.map((w, i) => (
           <div key={i} className="grid gap-2 md:grid-cols-12">
             <Input className="md:col-span-3" value={w.question} onChange={(e) => setWhys(whys.map((x, j) => j === i ? { ...x, question: e.target.value } : x))} />
@@ -178,6 +197,21 @@ export function CompleteCapa({ capaId, onDone }: { capaId: string; onDone: Done 
       <ErrBox err={err} />
       <Button size="sm" variant="success" loading={busy} disabled={cleanEv(ev).length === 0} data-testid="fb-capa-done"
         onClick={() => run(`/feedback/capa/${capaId}/complete`, { evidence: cleanEv(ev) }, "Đã hoàn thành CAPA")}>Xác nhận hoàn thành</Button>
+    </div>
+  );
+}
+
+export function CancelCapa({ capaId, onDone }: { capaId: string; onDone: Done }) {
+  const [reason, setReason] = useState("");
+  const { busy, err, run } = useCall(onDone);
+  return (
+    <div className="mt-2 space-y-2 rounded-lg bg-red-50 p-2" data-testid="fb-capa-cancel-box">
+      <div className="flex flex-wrap gap-2">
+        <Input className="max-w-md" placeholder="Lý do huỷ (bắt buộc)" value={reason} onChange={(e) => setReason(e.target.value)} data-testid="fb-capa-cancel-reason" />
+        <Button size="sm" variant="destructive" loading={busy} disabled={reason.trim().length < 3} data-testid="fb-capa-cancel"
+          onClick={() => run(`/feedback/capa/${capaId}/cancel`, { reason }, "Đã huỷ CAPA")}>Xác nhận huỷ</Button>
+      </div>
+      <ErrBox err={err} />
     </div>
   );
 }

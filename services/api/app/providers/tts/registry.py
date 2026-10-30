@@ -18,6 +18,13 @@ def get_tts_provider(db: Session, code: str, mode: str) -> TTSProvider:
                                                   ProviderAccount.provider_type == "TTS"))
     if acc is None:
         raise ValidationFailed(f"Nhà cung cấp giọng đọc '{code}' không tồn tại", code="UNKNOWN_PROVIDER")
+    adapter = (acc.config or {}).get("adapter")
+    if adapter == "vieneu_local":  # chạy trên máy, không cần API key
+        if not acc.is_enabled:
+            raise ProviderUnavailable(f"{acc.name} đang tắt (M15 → API Connections)")
+        from app.providers.tts.vieneu_local import VieNeuLocalProvider
+
+        return VieNeuLocalProvider(config=acc.config)
     if not acc.is_enabled or not acc.secret_encrypted:
         raise ProviderUnavailable(f"{acc.name} chưa bật hoặc chưa có API key (M15 → API Connections)")
     if (acc.config or {}).get("adapter") == "gemini_tts":

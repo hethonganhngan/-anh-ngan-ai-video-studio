@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FEEDBACK_STATUS, PRIORITY } from "@/lib/labels";
 import { cn, formatDate } from "@/lib/utils";
 import { CATEGORY_LABEL, EVIDENCE_LABEL, SOURCE_LABEL, STATUS_STEP_INDEX, STEPS, type FeedbackDetail } from "@/features/feedback/types";
-import { CapaForm, CompleteCapa, RcaForm, RestartForm, SimpleAction, StandardizeForm, TriageForm, ValidateForm, VerifyForm } from "@/features/feedback/actions";
+import { CancelCapa, CapaForm, CompleteCapa, RcaForm, RestartForm, SimpleAction, StandardizeForm, TriageForm, ValidateForm, VerifyForm } from "@/features/feedback/actions";
 
 function Stepper({ status }: { status: string }) {
   const idx = STATUS_STEP_INDEX[status] ?? 0;
@@ -125,9 +125,15 @@ export default function FeedbackDetailPage() {
                           {["IN_PROGRESS", "APPROVED"].includes(a.status) && st === "IN_PROGRESS" && (
                             <Button size="sm" variant="outline" onClick={() => setOpenCapa(openCapa === a.id ? null : a.id)} data-testid="fb-capa-open">Hoàn thành</Button>
                           )}
+                          {!["DONE", "CANCELLED"].includes(a.status) && ["RCA_PENDING", "ACTION_APPROVED", "IN_PROGRESS"].includes(st) && (
+                            <Can perm="feedback.manage">
+                              <Button size="sm" variant="ghost" onClick={() => setOpenCapa(openCapa === `x${a.id}` ? null : `x${a.id}`)} data-testid="fb-capa-cancel-open">Huỷ</Button>
+                            </Can>
+                          )}
                         </div>
                         {a.completion_evidence.length > 0 && <p className="mt-1 text-xs text-slate-600">Bằng chứng: {a.completion_evidence.map((e) => e.note || e.ref).join("; ")}</p>}
                         {openCapa === a.id && <CompleteCapa capaId={a.id} onDone={onDone} />}
+                        {openCapa === `x${a.id}` && <CancelCapa capaId={a.id} onDone={onDone} />}
                       </div>
                     ))}
                     {st === "RCA_PENDING" && (
@@ -163,7 +169,11 @@ export default function FeedbackDetailPage() {
                     <CardContent><SimpleAction path={`/feedback/${id}/close`} label="Đóng hồ sơ" ok="Đã đóng hồ sơ" testid="fb-close-submit" onDone={onDone} /></CardContent></Card>
                 </Can>
               )}
-              {d.lesson_id && <p className="text-sm">Đã tạo bài học: <Link className="text-brand-600 hover:underline" href={`/lessons?id=${d.lesson_id}`}>xem tại M09</Link></p>}
+              {(d.lessons?.length ?? 0) > 0 ? (
+                <p className="text-sm" data-testid="fb-lessons">Bài học M09: {d.lessons!.map((x, i) => (
+                  <span key={x.id}>{i > 0 && " · "}<Link className="text-brand-600 hover:underline" href={`/lessons?id=${x.id}`}>{x.code}</Link> ({x.status})</span>
+                ))}</p>
+              ) : d.lesson_id && <p className="text-sm">Đã tạo bài học: <Link className="text-brand-600 hover:underline" href={`/lessons?id=${d.lesson_id}`}>xem tại M09</Link></p>}
 
               <Card>
                 <CardHeader><CardTitle>Lịch sử</CardTitle></CardHeader>

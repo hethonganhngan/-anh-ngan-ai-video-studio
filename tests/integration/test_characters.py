@@ -102,6 +102,19 @@ def test_voice_lock_requires_consent_and_audio(login):
     assert pm.get(f"/voices/{v['id']}").json()["voice"]["status"] == "LOCKED"
 
 
+def test_delete_voice_blocked_while_in_use(login, channels):
+    pm, creator = login("pm"), login("creator")
+    v = pm.post("/voices", json={"name": "Giọng tạm", "accent": "Miền Nam"}).json()
+    c = pm.post("/characters", json={"name": "Chị Mai", "appearance": "a", "outfit": "b", "voice_profile_id": v["id"]}).json()
+    assert creator.delete(f"/voices/{v['id']}").status_code == 403
+    r = pm.delete(f"/voices/{v['id']}")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "VOICE_IN_USE" and c["code"] in r.json()["error"]["message"]
+    pm.patch(f"/characters/{c['id']}", json={"voice_profile_id": None})
+    assert pm.delete(f"/voices/{v['id']}").json() == {"deleted": v["code"]}
+    assert pm.get(f"/voices/{v['id']}").status_code == 404
+    assert all(x["id"] != v["id"] for x in pm.get("/voices").json())
+
+
 def test_scene_lock_versions(login, channels):
     pm, admin = login("pm"), login("admin")
     sl = pm.post("/scene-locks", json={"name": "Quầy tư vấn Ánh Ngân", "channel_id": channels["ANNGAN"]["id"],
@@ -130,3 +143,16 @@ def test_locked_character_flows_into_prompt(login, channels):
     assert c["code"] in prompt and "Character Lock v1" in prompt
     rep = pm.post(f"/projects/{p['id']}/validate-assets").json()
     assert rep["blocking"] == []
+
+
+def test_delete_character_blocked_while_project_uses_it(login, channels):
+    pm = login("pm")
+    c = pm.post("/characters", json={"name": "Chị Hoa", "appearance": "a", "outfit": "b"}).json()
+    p = create_project(pm, channels["ANNGAN"]["id"], topic="Mẹo pha sữa đúng cách", duration_sec=8,
+                       character_ids=[c["id"]], automation_level="MANUAL")
+    r = pm.delete(f"/characters/{c['id']}")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "CHARACTER_IN_USE" and p["code"] in r.json()["error"]["message"]
+    pm.post(f"/projects/{p['id']}/cancel", json={"note": "Thử xoá nhân vật"})
+    assert pm.delete(f"/characters/{c['id']}").json() == {"deleted": c["code"]}
+    assert pm.get(f"/characters/{c['id']}").status_code == 404
+    assert all(x["id"] != c["id"] for x in pm.get("/characters").json())

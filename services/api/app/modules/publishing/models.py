@@ -19,8 +19,9 @@ class Publication(UUIDMixin, TimestampMixin, DataModeMixin, Base):
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     post_url: Mapped[str | None] = mapped_column(String(500))
+    external_id: Mapped[str | None] = mapped_column(String(100))  # mã video/bài trên nền tảng (vd. Facebook Reel id)
     publish_mode: Mapped[str] = mapped_column(String(10), default="MANUAL")  # MANUAL | API
-    # DRAFT | SCHEDULED | PUBLISH_QUEUED | EXPORTED | PUBLISHED | FAILED | CANCELLED
+    # DRAFT | SCHEDULED | PUBLISH_QUEUED | EXPORTED | PENDING_REVIEW (nháp trên nền tảng chờ duyệt) | PUBLISHED | FAILED | CANCELLED
     status: Mapped[str] = mapped_column(String(20), default="DRAFT", index=True)
     export_asset_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"))
     error_message: Mapped[str | None] = mapped_column(Text)

@@ -39,6 +39,7 @@ class PubOut(ORM):
     scheduled_at: datetime | None
     published_at: datetime | None
     post_url: str | None
+    external_id: str | None
     publish_mode: str
     status: str
     export_asset_id: uuid.UUID | None
@@ -113,5 +114,27 @@ def publish_api(pid: uuid.UUID, ctx: Ctx = Depends(require("publish.execute"))):
 @router.post("/{pid}/cancel", response_model=PubOut)
 def cancel(pid: uuid.UUID, ctx: Ctx = Depends(require("publish.manage"))):
     pub = service.cancel_publication(ctx, pid)
+    ctx.db.commit()
+    return pub
+
+
+@router.post("/auto-prepare/{project_id}", response_model=list[PubOut])
+def auto_prepare(project_id: uuid.UUID, ctx: Ctx = Depends(require("publish.manage"))):
+    """M10 tự động: caption + hashtag + lịch đăng + gói xuất file cho mọi nền tảng của kênh; Facebook → bản nháp chờ duyệt."""
+    pubs = service.auto_prepare(ctx, project_id)
+    ctx.db.commit()
+    return pubs
+
+
+@router.post("/{pid}/facebook-draft", response_model=PubOut)
+def facebook_draft(pid: uuid.UUID, ctx: Ctx = Depends(require("publish.manage"))):
+    pub = service.send_facebook_draft(ctx, pid)
+    ctx.db.commit()
+    return pub
+
+
+@router.post("/{pid}/facebook-sync", response_model=PubOut)
+def facebook_sync(pid: uuid.UUID, ctx: Ctx = Depends(require("publish.manage"))):
+    pub = service.sync_facebook(ctx, pid)
     ctx.db.commit()
     return pub
