@@ -241,6 +241,14 @@ def _auto_voiceover(ctx: Ctx, project) -> None:
         log.warning("auto voiceover %s: %s", project.code, e.message)
 
 
+def _provider_voice(ctx: Ctx, project) -> bool:
+    """Provider cấu hình giữ giọng nói do chính nó tạo (vd. Flow, CEO chốt 31/10/2026) → không lồng giọng TTS."""
+    from app.modules.administration.models import ProviderAccount
+
+    acc = ctx.db.scalar(select(ProviderAccount).where(ProviderAccount.provider_code == project.video_provider_code))
+    return bool(acc and (acc.config or {}).get("provider_voice"))
+
+
 def _after_scene_change(ctx: Ctx, project) -> None:
     """Tổng hợp trạng thái cảnh → chuyển trạng thái dự án."""
     from app.modules.generation.models import GenerationJob
@@ -275,9 +283,9 @@ def _after_scene_change(ctx: Ctx, project) -> None:
 
                 sync_timeline_clips(ctx, project)  # timeline đã lưu phải dùng clip mới của cảnh vừa tạo lại
                 project.last_error = None
-                if project.automation_level == "AUTO":
+                if project.automation_level == "AUTO" and not _provider_voice(ctx, project):
                     _auto_voiceover(ctx, project)
-                mute_provider_audio(ctx, project)  # sau lồng tiếng: tiếng gốc Flow luôn tắt, kể cả khi lồng tiếng lỗi
+                mute_provider_audio(ctx, project)  # đặt âm lượng tiếng gốc theo cấu hình provider
                 start_render(ctx, project, timeline=None, actor_check=False)
         return
     if active:

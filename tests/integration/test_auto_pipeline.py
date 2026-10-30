@@ -94,3 +94,19 @@ def test_flow_audio_always_muted_even_without_voiceover():
     acc.config = {}  # provider không cấu hình (vd. Veo) → giữ nguyên
     p.timeline["clips"][0]["volume"] = 0.35
     assert mute_provider_audio(ctx, p) is None and p.timeline["clips"][0]["volume"] == 0.35
+
+
+def test_auto_keeps_provider_voice_without_tts(login, channels, monkeypatch):
+    """Flow giữ nguyên giọng nói tự tạo (CEO chốt 31/10/2026): AUTO không lồng giọng TTS, tiếng gốc clip giữ 100%."""
+    from app.workflows import jobs
+
+    monkeypatch.setattr(jobs, "_provider_voice", lambda ctx, p: True)
+    pm = login("pm")
+    p = create_project(pm, channels["ANNGAN"]["id"], topic="Giữ giọng Flow", duration_sec=8,
+                       automation_level="AUTO", voice_profile_id=_voice(pm))
+    pm.post(f"/projects/{p['id']}/advance")
+    ov = pm.get(f"/projects/{p['id']}/overview").json()
+    assert ov["project"]["status"] == "FINAL_QC" and ov["renders"]
+    tl = pm.get(f"/projects/{p['id']}/timeline").json()
+    tl = tl.get("timeline", tl)
+    assert not tl.get("voiceover") and all(c.get("volume", 1.0) == 1.0 for c in tl["clips"])
