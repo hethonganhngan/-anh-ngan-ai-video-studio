@@ -60,6 +60,10 @@ class FakeLocator:
 
     def _items(self):
         s = self.p.s
+        if self.kind == "menuitem" and isinstance(self.text, str):  # menu chọn mô hình
+            return [m for m in s["models"] if self.text in m] if s.get("model_menu") else []
+        if self.kind == "radio":
+            return [self.name] if self.name in s["radios"] else []
         if self.kind == "menuitem":
             items = ["720p / Kích thước gốc", "1080p / Đã tăng độ phân giải"] if s["menu"] else []
             return [i for i in items if self.text is None or self.text.search(i)]
@@ -83,10 +87,18 @@ class FakeLocator:
     def count(self):
         return len(self._items())
 
-    def filter(self, has_text):
-        return FakeLocator(self.p, self.kind, self.name, has_text)
+    def filter(self, has_text=None, visible=None):
+        return FakeLocator(self.p, self.kind, self.name, has_text if has_text is not None else self.text)
 
-    def get_by_role(self, role, name=None):
+    def get_attribute(self, attr):
+        s = self.p.s
+        if self.kind == "radio":
+            return "true" if self.name in s["picked"] else "false"
+        if self.kind == "button" and self.name == F.AGENT_BUTTON:
+            return "true" if s["agent"] else "false"
+        return None
+
+    def get_by_role(self, role, name=None, exact=None):
         return FakeLocator(self.p, role, name)
 
     def locator(self, sel):
@@ -111,6 +123,15 @@ class FakeLocator:
             s["clicked"], s["clicked_at"] = True, s["ticks"]
         elif self.kind == "button" and self.name == F.DOWNLOAD_BUTTON:
             s["menu"] = s["ready"]
+        elif self.kind == "button" and self.name == F.AGENT_BUTTON:
+            s["agent"] = not s["agent"]
+        elif self.kind == "button" and self.text == "arrow_drop_down":
+            s["model_menu"] = True
+        elif self.kind == "menuitem" and isinstance(self.text, str):
+            s["model"], s["model_menu"] = self._items()[0], False
+            s["picked"] = [n for n in s["picked"] if n in ("Video", "Thành phần")]  # đổi mô hình đặt lại lựa chọn khác
+        elif self.kind == "radio":
+            s["picked"].append(self.name)
         elif self.kind == "option":
             s["chips"].append(self._items()[0])
             s["typed"] = ""
@@ -130,7 +151,7 @@ class FakePage:
     def goto(self, url, **_):
         self.url = self.s.get("redirect", url)
 
-    def get_by_role(self, role, name=None):
+    def get_by_role(self, role, name=None, exact=None):
         return FakeLocator(self, role, name)
 
     def locator(self, sel):
@@ -174,7 +195,9 @@ EDIT_ID_RE = F.EDIT_ID
 @pytest.fixture
 def fake_chrome(monkeypatch):
     s = {"first_tile": "Cửa hàng Ánh Ngân.jpg", "ticks": 0, "ready_at": 3, "ready": False, "clicked": False, "menu": False,
-         "filled": None, "closed": False, "downloads": [], "typed": "", "chips": [],
+         "filled": None, "closed": False, "agent": True, "picked": [], "model": None,
+         "radios": ["Video", "Thành phần", "9:16", "720p", "4 giây", "8 giây", "x1"],
+         "models": ["Omni 1.1 Flash", "Veo 3.1 - Fast"], "downloads": [], "typed": "", "chips": [],
          "library": ["MeAnhNgan", "Cửa hàng Ánh Ngân.jpg"], "file_name": "Mẹ_tư_vấn_chọn_sữa_22222222.mp4"}
     ctx = types.SimpleNamespace(new_page=lambda: FakePage(s))
     browser = types.SimpleNamespace(contexts=[ctx])
@@ -202,6 +225,18 @@ def test_generate_opens_new_item_and_downloads_original_720p(fake_chrome):
     assert "Mẹ Ánh Ngân chào khách" in fake_chrome["filled"]
     assert fake_chrome["chips"] == ["MeAnhNgan", "Cửa hàng Ánh Ngân.jpg"]  # gắn nhân vật + ảnh cửa hàng trước khi tạo
     assert fake_chrome["opened"] == "Mẹ tư vấn chọn sữa (mới)"  # mở đúng ô vừa tạo xong, không phải nội dung cũ
+    # tắt tác nhân, tạo trực tiếp: Video · Thành phần · Omni 1.1 Flash · 9:16 · 720p · 8 giây · x1
+    assert not fake_chrome["agent"] and fake_chrome["model"] == F.DEFAULT_MODEL
+    assert fake_chrome["picked"] == ["Video", "Thành phần", "9:16", "720p", "8 giây", "x1"]
+
+
+def test_settings_not_found_stops_before_spending_credits(fake_chrome):
+    fake_chrome["radios"].remove("x1")  # giao diện đổi → không chắc chỉ tạo 1 video
+    job_id = FlowCDPProvider("flow_cdp", "Flow", {})._generate(GenerationSpec(job_ref="j", prompt_text=PROMPT))
+    assert job_id.startswith(F.MANUAL) and "Không chọn được cài đặt Flow" in job_id and not fake_chrome["clicked"]
+    fake_chrome["radios"].append("x1")
+    job_id = FlowCDPProvider("flow_cdp", "Flow", {"model": "Veo 9"})._generate(GenerationSpec(job_ref="j", prompt_text=PROMPT))
+    assert job_id.startswith(F.MANUAL) and "Veo 9" in job_id and not fake_chrome["clicked"]
 
 
 def test_no_ingredient_found_stops_before_spending_credits(fake_chrome):

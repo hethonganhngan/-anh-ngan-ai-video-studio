@@ -21,6 +21,7 @@
 - **Lưu ý prompt M05 (2026-10-30, D24):** A02.script v2 + A03.scene_prompt v2 đã kích hoạt ở PRODUCTION (quy tắc thoại tự nhiên, khối nhận diện, chống lộ AI); `to_flow_prompt` giữ nguyên ngoại hình + trang phục và các dòng "Lưu ý". Seed mới cũng mang các quy tắc này.
 - **Nhân vật Flow đổi tên `MeAnhNgan` (2026-10-30):** config `flow_cdp.ingredients` = ["MeAnhNgan","Cửa hàng Ánh Ngân"] (tên cũ khớp nhầm video "Mẹ Ánh Ngân tư vấn sữa…"). Caption bài đăng tự thêm "(*) Nhân vật minh hoạ, video có sử dụng AI." (D24).
 - **Khớp môi (2026-10-30, D25):** `flow_cdp.speech_in_video`=true (tiếng Flow chỉ làm mốc, `voiceover_scene_volume`=0); `voiceover.speech_window` căn giọng chính chủ theo khoảng nói. Gồm luôn phần phân vai giọng phụ (VoiceOption, `voice_options` VieNeu).
+- **Flow tắt tác nhân (2026-10-30, D26):** `flow_cdp._setup` tắt tác nhân + chọn Video · Thành phần · 9:16 · 720p · 8 giây · x1 · Omni 1.1 Flash (`config.model`). Đã chạy thử khô trên Flow thật (không gửi).
 
 ## Kiểm thử (lần chạy cuối 2026-10-29)
 | Bộ | Kết quả |

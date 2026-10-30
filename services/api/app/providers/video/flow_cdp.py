@@ -3,7 +3,7 @@
 Dùng lượt tạo video của gói Google (AI Pro/Ultra) → không phát sinh phí API. Rủi ro đã được CEO chấp nhận:
 Google có thể hạn chế tài khoản vì truy cập tự động; giao diện Flow đổi là phải chỉnh bộ chọn bên dưới.
 - Chrome chạy riêng: scripts/windows/start-flow-chrome.ps1 (cổng CDP chỉ nghe 127.0.0.1, profile riêng đã đăng nhập Flow).
-- Mỗi lần chỉ 1 cảnh (khoá Redis): phiên tác nhân mới → gửi prompt → ô đầu lưới hiện % rồi xong
+- Mỗi lần chỉ 1 cảnh (khoá Redis): tắt tác nhân, chọn Video · Thành phần · 9:16 · x1 · mô hình → gửi prompt → ô đầu lưới hiện % rồi xong
   → mở ô → Tải xuống 720p (kích thước gốc) → đóng tab. Mỗi câu lệnh gắn chip '@' nhân vật + ảnh cửa hàng
   đã lưu trong dự án Flow (config 'ingredients') để giữ đúng khuôn mặt, trang phục và bối cảnh.
   Toàn bộ chạy đồng bộ trong submit_generation; provider_job_id mang kết quả (đường dẫn file hoặc lý do chờ thủ công).
@@ -20,7 +20,7 @@ from app.providers.video.veo_vertex import NO_TEXT, SILENT_SPEECH
 
 DEFAULT_CDP = "http://127.0.0.1:9222"
 DEFAULT_PROJECT = "https://flow.google.com/project/6ae396ef-7905-495b-90b1-564042d940cd"
-PROMPT_BOX = "Bạn muốn tạo gì?"
+PROMPT_BOX = re.compile(r"Bạn muốn tạo (những )?gì")  # "…những gì?" khi tắt tác nhân
 SUBMIT_BUTTON = "Bắt đầu tạo"
 OK, MANUAL = "flowcdp:ok:", "flowcdp:manual:"
 LOCK_KEY = "anngan:flow_cdp:lock"
@@ -32,7 +32,11 @@ NOTE = re.compile(r"^Lưu ý:\s*(.+)$", re.MULTILINE)
 LOCK_TAG = re.compile(r"\[(Character|Scene) Lock[^\]]*\]|\b(CHR|SCN)-\d{4}-\d{4}\s*")
 
 DOWNLOAD_BUTTON = "Tải nội dung nghe nhìn xuống"
-NEW_SESSION = "Bắt đầu phiên mới"  # mỗi cảnh 1 phiên tác nhân — phiên cũ khiến Flow mở lại/sửa cảnh trước
+# Tắt tác nhân (CEO chốt): tạo trực tiếp bằng bảng cài đặt — Video · Thành phần · 9:16 · 720p · N giây · x1 · mô hình
+AGENT_BUTTON = "Tác nhân"
+SETTINGS_BUTTON = "Điều kiện kích hoạt cài đặt"
+DEFAULT_MODEL = "Omni 1.1 Flash"  # 12 tín dụng/cảnh 8 giây x1
+FLOW_DURATIONS = (4, 6, 8, 10)
 PICKER_LIST = "Danh sách thành phần"  # hộp chọn thành phần mở khi gõ "@" trong ô lệnh
 DEFAULT_INGREDIENTS = ("MeAnhNgan", "Cửa hàng Ánh Ngân")  # nhân vật + ảnh cửa hàng đã lưu trong dự án Flow
 QUALITY = re.compile(r"720p|Kích thước gốc")  # bản gốc — các mức 1080p/4K là tăng độ phân giải
@@ -41,7 +45,7 @@ EDIT_ID = re.compile(r"/edit/([0-9a-f-]{36})")
 TILE = "flow-grid-tile-container"
 PROGRESS = re.compile(r"(?<![0-9])[0-9]{1,3} ?%")
 TILE_FAILED = re.compile(r"không thành công|thất bại|failed|error", re.I)
-START_TIMEOUT_SEC = 300  # tác nhân phải bắt đầu tạo (ô % xuất hiện) trong 5 phút
+START_TIMEOUT_SEC = 300  # Flow phải bắt đầu tạo (ô % xuất hiện) trong 5 phút
 
 
 def to_flow_prompt(prompt_text: str, duration_sec: int, speech_in_video: bool) -> str:
@@ -99,6 +103,7 @@ class FlowCDPProvider(VideoProvider):
         self.timeout_sec = int(self.config.get("timeout_min", 15)) * 60
         self.speech_in_video = bool(self.config.get("speech_in_video", False))
         self.ingredients = list(self.config.get("ingredients", DEFAULT_INGREDIENTS))
+        self.model = self.config.get("model", DEFAULT_MODEL)
         self.unit_cost_vnd_per_sec = 0  # dùng lượt của gói Google — không tính phí API
 
     # ---------- trình duyệt ----------
@@ -123,8 +128,44 @@ class FlowCDPProvider(VideoProvider):
         except Exception:  # noqa: BLE001
             if CHALLENGE.search(page.url) or page.locator("iframe[src*='recaptcha']").count():
                 return page, None, "Flow yêu cầu đăng nhập/xác minh — mở Chrome Flow, đăng nhập rồi tạo lại cảnh"
-            return page, None, f"Không thấy ô '{PROMPT_BOX}' trên Flow (giao diện có thể đã đổi) — {page.url}"
+            return page, None, f"Không thấy ô 'Bạn muốn tạo những gì?' trên Flow (giao diện có thể đã đổi) — {page.url}"
         return page, box, None
+
+    def _setup(self, page, duration_sec: int) -> str | None:
+        """Tắt tác nhân rồi chọn đúng cài đặt tạo video. Trả về lý do nếu không chọn được (chưa gửi gì)."""
+        agent = page.get_by_role("button", name=AGENT_BUTTON, exact=True)
+        if agent.count() and agent.first.get_attribute("aria-pressed") == "true":
+            agent.first.click()
+            page.wait_for_timeout(1000)
+        page.get_by_role("button", name=SETTINGS_BUTTON).click()
+        page.wait_for_timeout(1500)
+
+        def pick(name: str, required: bool = True) -> bool:
+            radio = page.get_by_role("radio", name=name)
+            if not radio.count():
+                return not required
+            radio.first.click()
+            page.wait_for_timeout(500)
+            return radio.first.get_attribute("aria-checked") == "true" or not required
+
+        ok = pick("Video") and pick("Thành phần")
+        if ok:  # đổi mô hình có thể đặt lại các lựa chọn khác → chọn mô hình trước
+            page.get_by_role("button").filter(has_text="arrow_drop_down").filter(visible=True).first.click()
+            page.wait_for_timeout(800)
+            item = page.get_by_role("menuitem").filter(has_text=self.model)
+            ok = bool(item.count())
+            if ok:
+                item.first.click()
+                page.wait_for_timeout(1200)
+        duration = next((d for d in FLOW_DURATIONS if d >= duration_sec), FLOW_DURATIONS[-1])
+        # Veo cố định 8 giây/720p (không có nút) → không bắt buộc
+        ok = ok and pick("9:16") and pick("720p", False) and pick(f"{duration} giây", False) and pick("x1")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(500)
+        if not ok:
+            return (f"Không chọn được cài đặt Flow (Video · Thành phần · 9:16 · x1 · {self.model}) — giao diện có thể đã đổi, "
+                    "chưa gửi tạo video" + self._snapshot(page))
+        return None
 
     def _attach(self, page, box, name: str) -> bool:
         """Gõ "@" + tên → chọn trong 'Danh sách thành phần' → Flow chèn chip tham chiếu (nhân vật/ảnh) vào câu lệnh."""
@@ -187,7 +228,7 @@ class FlowCDPProvider(VideoProvider):
             page.wait_for_timeout(10000)
             if CHALLENGE.search(page.url):
                 raise _NeedsManual("Flow chuyển sang trang đăng nhập/xác minh trong lúc tạo — xử lý trên Chrome Flow")
-            if EDIT_ID.search(page.url):  # tác nhân tự mở trang chỉnh sửa → quay lại lưới để theo dõi ô mới
+            if EDIT_ID.search(page.url):  # Flow tự mở trang chỉnh sửa → quay lại lưới để theo dõi ô mới
                 page.goto(self.project_url, wait_until="domcontentloaded", timeout=60000)
                 continue
             text = self._first_tile_text(page)
@@ -196,8 +237,8 @@ class FlowCDPProvider(VideoProvider):
                 continue
             if not started:
                 if time.monotonic() > start_deadline:
-                    raise _NeedsManual("Flow chưa bắt đầu tạo video sau 5 phút (tác nhân có thể đang hỏi lại) — "
-                                       "xem khung tác nhân trên Chrome Flow" + self._snapshot(page))
+                    raise _NeedsManual("Flow chưa bắt đầu tạo video sau 5 phút (hết tín dụng hoặc câu lệnh bị chặn?) — "
+                                       "xem trên Chrome Flow" + self._snapshot(page))
                 continue
             if TILE_FAILED.search(text):
                 raise _NeedsManual(f"Flow báo tạo video không thành công: {text.strip()[:200]}" + self._snapshot(page))
@@ -233,10 +274,9 @@ class FlowCDPProvider(VideoProvider):
                 if problem:
                     return MANUAL + problem
                 page.wait_for_timeout(3000)
-                new_session = page.get_by_role("button", name=NEW_SESSION)
-                if new_session.count():
-                    new_session.first.click()
-                    page.wait_for_timeout(1500)
+                problem = self._setup(page, spec.duration_sec)
+                if problem:
+                    return MANUAL + problem
                 box.click()
                 prompt = to_flow_prompt(spec.prompt_text, spec.duration_sec, self.speech_in_video)
                 box.fill(prompt + (" Tham chiếu nhân vật và bối cảnh cửa hàng:" if self.ingredients else ""))
