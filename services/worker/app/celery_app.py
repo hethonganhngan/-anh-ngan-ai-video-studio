@@ -11,8 +11,10 @@ setup_logging()
 celery = get_celery()
 celery.conf.beat_schedule = {
     "recover-stuck-jobs": {"task": "anngan.workflow.recover_stuck", "schedule": crontab(minute="*/5")},
+    "sync-facebook-drafts": {"task": "anngan.publishing.sync_facebook", "schedule": crontab(minute="*/10")},
 }
 
 import app.tasks.generation  # noqa: E402,F401
 import app.tasks.maintenance  # noqa: E402,F401
+import app.tasks.publishing  # noqa: E402,F401
 import app.tasks.rendering  # noqa: E402,F401

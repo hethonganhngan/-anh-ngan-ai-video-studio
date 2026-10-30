@@ -188,7 +188,8 @@ def _detail(ctx: Ctx, case_id) -> dict:
             "capa": [CAPAOut.model_validate(x).model_dump(mode="json") for x in d["capa"]],
             "verifications": [VerificationOut.model_validate(x).model_dump(mode="json") for x in d["verifications"]],
             "events": [EventOut.model_validate(x).model_dump(mode="json") for x in d["events"]],
-            "overdue": d["overdue"],
+            "overdue": d["overdue"], "lessons": d["lessons"],
+            "lesson_id": d["lessons"][0]["id"] if d["lessons"] else None,
             "allowed_next": sorted(service.TRANSITIONS.get(d["case"].status, set()))}
 
 
@@ -283,6 +284,17 @@ def start(case_id: uuid.UUID, data: NoteIn, ctx: Ctx = Depends(require("feedback
 @router.post("/capa/{capa_id}/complete")
 def complete_capa(capa_id: uuid.UUID, data: CompleteIn, ctx: Ctx = Depends(require("feedback.view"))):
     a = service.complete_capa(ctx, capa_id, [e.model_dump() for e in data.evidence])
+    ctx.db.commit()
+    return _detail(ctx, a.feedback_case_id)
+
+
+class CancelIn(BaseModel):
+    reason: str = Field(min_length=3)
+
+
+@router.post("/capa/{capa_id}/cancel")
+def cancel_capa(capa_id: uuid.UUID, data: CancelIn, ctx: Ctx = Depends(require("feedback.manage"))):
+    a = service.cancel_capa(ctx, capa_id, data.reason)
     ctx.db.commit()
     return _detail(ctx, a.feedback_case_id)
 

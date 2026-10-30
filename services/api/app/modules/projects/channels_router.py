@@ -58,12 +58,48 @@ def _brand(b: BrandProfile | None) -> dict | None:
 def _out(ctx: Ctx, c: Channel) -> dict:
     n = ctx.db.scalar(select(func.count()).select_from(Project).where(Project.channel_id == c.id, Project.data_mode == ctx.mode))
     return {"id": str(c.id), "code": c.code, "name": c.name, "description": c.description, "platforms": c.platforms,
-            "is_active": c.is_active, "project_count": n, "brand": _brand(c.brand_profile)}
+            "is_active": c.is_active, "project_count": n,
+            "publish_targets": c.publish_targets or {}, "brand": _brand(c.brand_profile)}
 
 
 @router.get("")
 def list_channels(ctx: Ctx = Depends(require("channel.view"))):
     return [_out(ctx, c) for c in ctx.db.scalars(select(Channel).where(Channel.deleted_at.is_(None)).order_by(Channel.created_at)).all()]
+
+
+class FacebookTargetIn(BaseModel):
+    page_id: str | None = Field(default=None, pattern=r"^\d{5,30}$")
+
+
+@router.get("/facebook/pages")
+def facebook_pages(ctx: Ctx = Depends(require("channel.edit"))):
+    """Các Fanpage mà token Facebook (M15) quản lý được — để gắn vào kênh."""
+    from app.modules.publishing.service import facebook_call_pages
+
+    return facebook_call_pages(ctx)
+
+
+@router.put("/{cid}/facebook")
+def connect_facebook(cid: uuid.UUID, data: FacebookTargetIn, ctx: Ctx = Depends(require("channel.edit"))):
+    """Gắn/bỏ gắn Fanpage cho kênh. Kiểm tra token đọc được trang trước khi lưu. Hệ thống chỉ gửi BẢN NHÁP chờ duyệt."""
+    from app.modules.publishing.service import facebook_page_check
+
+    c = ctx.db.get(Channel, cid)
+    if c is None or c.deleted_at:
+        raise NotFound("Không tìm thấy kênh")
+    targets = dict(c.publish_targets or {})
+    if data.page_id:
+        page = facebook_page_check(ctx, data.page_id)
+        targets["FACEBOOK"] = {"page_id": page["id"], "page_name": page["name"], "mode": "DRAFT",
+                               "connected_at": datetime.now(timezone.utc).isoformat()}
+        if "FACEBOOK" not in (c.platforms or []):
+            c.platforms = [*(c.platforms or []), "FACEBOOK"]
+    else:
+        targets.pop("FACEBOOK", None)
+    c.publish_targets = targets
+    audit.record(ctx, "channel.facebook", "channel", c.id, after={"page": (targets.get("FACEBOOK") or {}).get("page_id")})
+    ctx.db.commit()
+    return _out(ctx, c)
 
 
 @router.get("/{cid}")

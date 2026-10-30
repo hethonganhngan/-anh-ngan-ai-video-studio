@@ -53,14 +53,19 @@ def get_or_create_script(ctx: Ctx, p: Project) -> Script:
     return s
 
 
-def _system_prompt(ctx: Ctx, brief: dict) -> tuple[str, str]:
+def _system_prompt(ctx: Ctx, brief: dict, p: Project) -> tuple[str, str]:
+    """Prompt A02 = template đang hiệu lực + bài học M09 đã duyệt liên quan dự án (hệ thống học từ Feedback Loop)."""
+    from app.modules.learning.service import lesson_rules, prompt_lessons
+
     tpl = prompts.get_template(ctx, "A02.script")
     ver = prompts.active_version(ctx, tpl)
     policy = get_setting(ctx.db, "generation.policy")
+    lessons = prompt_lessons(ctx, p)
     text = A02.render_system_prompt(ver.content, {**brief, "scene_seconds": policy["scene_seconds"],
                                                    "forbidden_terms": ", ".join(brief["forbidden_terms"]),
-                                                   "rules": ver.rules or []})
-    return text, f"{tpl.code} v{ver.version_no}"
+                                                   "rules": [*(ver.rules or []), *lesson_rules(lessons)]})
+    label = f"{tpl.code} v{ver.version_no}"
+    return text, label + (f" + bài học {', '.join(x.code for x in lessons)}" if lessons else "")
 
 
 def generate_ideas(ctx: Ctx, project_id) -> Script:
@@ -75,7 +80,7 @@ def generate_ideas(ctx: Ctx, project_id) -> Script:
     elif p.status != "SCRIPT_GENERATING":
         raise InvalidTransition(f"Không thể tạo ý tưởng khi dự án ở trạng thái {p.status}")
     brief = _brief(ctx, p)
-    system, label = _system_prompt(ctx, brief)
+    system, label = _system_prompt(ctx, brief, p)
     user_prompt = A02.build_user_prompt_ideas(brief)
 
     def work(llm, actx):
@@ -189,7 +194,7 @@ def write_script(ctx: Ctx, project_id) -> ScriptVersion:
     brief = _brief(ctx, p)
     chars = _characters(ctx, p)
     policy = get_setting(ctx.db, "generation.policy")
-    system, label = _system_prompt(ctx, brief)
+    system, label = _system_prompt(ctx, brief, p)
     user_prompt = A02.build_user_prompt_script(brief, idea, chars, policy["scene_seconds"])
 
     def work(llm, actx):

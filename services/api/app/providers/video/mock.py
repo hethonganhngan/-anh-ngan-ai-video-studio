@@ -54,7 +54,7 @@ class MockVideoProvider(VideoProvider):
             out = _work_dir() / f"{job_id}.mp4"
             self._render(spec, str(out))
             state = {"state": "SUCCEEDED", "file": str(out)}
-        self._state_path(job_id).write_text(json.dumps(state, ensure_ascii=False, default=str))
+        self._state_path(job_id).write_text(json.dumps(state, ensure_ascii=False, default=str), encoding="utf-8")
         return job_id
 
     def _render(self, spec: GenerationSpec, out: str) -> None:
@@ -96,7 +96,7 @@ class MockVideoProvider(VideoProvider):
         p = self._state_path(job_id)
         if not p.exists():
             raise ProviderError("Không tìm thấy tác vụ mock", code="NOT_FOUND", retryable=False)
-        return json.loads(p.read_text())
+        return json.loads(p.read_text(encoding="utf-8"))
 
     def get_status(self, provider_job_id):
         st = self._load(provider_job_id)
@@ -112,10 +112,10 @@ class MockVideoProvider(VideoProvider):
     def cancel_job(self, provider_job_id):
         p = self._state_path(provider_job_id)
         if p.exists():
-            st = json.loads(p.read_text())
+            st = json.loads(p.read_text(encoding="utf-8"))
             if st["state"] in ("RUNNING", "SUBMITTED"):
                 st["state"] = "CANCELLED"
-                p.write_text(json.dumps(st))
+                p.write_text(json.dumps(st), encoding="utf-8")
         return True
 
 

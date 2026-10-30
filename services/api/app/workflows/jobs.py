@@ -380,6 +380,52 @@ def recover_stuck_jobs(older_than_minutes: int = 10) -> dict:
     return {"generation": len(gen_ids), "render": len(ren_ids), "abandoned_agent_runs": abandoned}
 
 
+# ====================== PUBLISHING (M10) ======================
+def auto_prepare_publishing(project_id: str, mode: str) -> int:
+    """Sau khi video được người phê duyệt: chuẩn bị bài đăng tự động (idempotent — nền tảng đã có bài thì bỏ qua)."""
+    from app.modules.publishing.service import auto_prepare
+
+    db = SessionLocal()
+    try:
+        ctx = Ctx(db=db, actor=Actor(type="SYSTEM", id=None, label="M10 tự động"), mode=mode)
+        n = len(auto_prepare(ctx, project_id))
+        db.commit()
+        return n
+    except Exception:
+        db.rollback()
+        log.exception("auto_prepare_publishing %s failed", project_id)
+        raise
+    finally:
+        db.close()
+
+
+def sync_facebook_drafts() -> dict:
+    """Định kỳ: bản nháp Facebook đã được duyệt đăng → PUBLISHED + URL thật (không cần dán link thủ công)."""
+    from app.core.errors import AppError
+    from app.modules.publishing.models import Publication
+    from app.modules.publishing.service import sync_facebook
+
+    db = SessionLocal()
+    out = {"checked": 0, "published": 0, "errors": 0}
+    try:
+        rows = db.scalars(select(Publication).where(Publication.status == "PENDING_REVIEW",
+                                                    Publication.data_mode == "PRODUCTION")).all()
+        for pub in rows:
+            ctx = Ctx(db=db, actor=Actor(type="SYSTEM", id=None, label="M10 đồng bộ Facebook"), mode="PRODUCTION")
+            try:
+                out["checked"] += 1
+                if sync_facebook(ctx, pub.id).status == "PUBLISHED":
+                    out["published"] += 1
+                db.commit()
+            except AppError as e:
+                db.rollback()
+                out["errors"] += 1
+                log.warning("sync_facebook %s: %s", pub.id, e.message)
+        return out
+    finally:
+        db.close()
+
+
 def tmp_path(suffix: str) -> str:
     from app.media.storage import tmp_dir
 

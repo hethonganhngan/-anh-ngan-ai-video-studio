@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarPlus, Info } from "lucide-react";
+import { CalendarPlus, Info, Wand2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAction } from "@/hooks/use-mutate";
 import { PageHeader } from "@/components/app/page-header";
 import { RequirePermission, Can } from "@/components/app/require";
 import { EmptyState, QueryView } from "@/components/app/states";
@@ -32,6 +33,9 @@ export default function PublishingPage() {
   const titles = useMemo(() => new Map((approved.data ?? []).map((p) => [p.id, p.code])), [approved.data]);
   const titleOf = (id: string) => titles.get(id) ?? id.slice(0, 8);
   const chOf = (id?: string) => channels.data?.find((c) => c.id === id);
+  const prepared = useMemo(() => new Set((pubs.data ?? []).filter((x) => x.status !== "CANCELLED").map((x) => x.project_id)), [pubs.data]);
+  const auto = useAction((pid: string) => api<Publication[]>(`/publications/auto-prepare/${pid}`, { method: "POST" }),
+    { success: (r) => (r.length ? `Đã chuẩn bị ${r.length} bài đăng` : "Mọi nền tảng đã có bài đăng"), invalidate: [["publications"]] });
   return (
     <RequirePermission perm="publish.view">
       <PageHeader code="M10" title="Publishing & Analytics" description="Lịch nội dung, bài đăng, xuất file đăng thủ công, số liệu hiệu quả sau đăng."
@@ -40,7 +44,7 @@ export default function PublishingPage() {
         </NativeSelect>} />
       <div className="mb-4 flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600" data-testid="pub-api-note">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-        <p>Chỉ kết nối nền tảng qua <b>API chính thức được cấp quyền</b> (cấu hình tại M15). Khi chưa kết nối: dùng <b>Xuất file</b> và <b>Đánh dấu đã đăng</b> thủ công. Dữ liệu DEMO không bao giờ được tự động xuất bản.</p>
+        <p><b>Tự động:</b> video được phê duyệt ở M07 → hệ thống tự soạn caption + hashtag, xếp lịch theo khung giờ của kênh (1 bài/ngày/nền tảng) và xuất gói đăng. Kênh đã gắn Fanpage (M13) → video lên Facebook dưới dạng <b>bản nháp chờ duyệt</b>, chỉ công khai khi anh/chị bấm đăng trong Meta Business Suite; trạng thái tự đồng bộ mỗi 10 phút. Nền tảng khác: <b>Xuất file</b> và <b>Đánh dấu đã đăng</b>. Dữ liệu DEMO không bao giờ được gửi lên nền tảng.</p>
       </div>
       <Tabs defaultValue="calendar">
         <TabsList>
@@ -62,7 +66,10 @@ export default function PublishingPage() {
                         <TD className="font-mono text-xs"><Link className="text-brand-600 hover:underline" href={`/projects/${p.id}`}>{p.code}</Link>{p.data_mode === "DEMO" && <Badge className="ml-1" variant="yellow">DEMO</Badge>}</TD>
                         <TD className="max-w-xs truncate">{p.title}</TD><TD>{p.channel.name}</TD>
                         <TD><StatusBadge map={PROJECT_STATUS} value={p.status} /></TD><TD className="text-xs">{formatDate(p.approved_at)}</TD>
-                        <TD><Can perm="publish.manage"><Button size="sm" onClick={() => setCreating(p)} data-testid="pub-schedule"><CalendarPlus />Lên lịch đăng</Button></Can></TD>
+                        <TD><Can perm="publish.manage"><div className="flex flex-wrap gap-1">
+                          {!prepared.has(p.id) && <Button size="sm" variant="success" loading={auto.isPending && auto.variables === p.id} onClick={() => auto.mutate(p.id)} data-testid="pub-auto"><Wand2 />Tự chuẩn bị đăng</Button>}
+                          <Button size="sm" variant={prepared.has(p.id) ? "default" : "outline"} onClick={() => setCreating(p)} data-testid="pub-schedule"><CalendarPlus />Lên lịch đăng</Button>
+                        </div></Can></TD>
                       </TR>))}
                     </TBody>
                   </Table>

@@ -114,7 +114,9 @@ def test_lesson_approve_apply_rollback_changes_prompt(login, channels):
     assert pm.post(f"/lessons/{lesson_id}/apply").json()["error"]["code"] == "LESSON_NOT_APPROVED"
     pm.post(f"/lessons/{lesson_id}/submit")
     assert qc.post(f"/lessons/{lesson_id}/review", json={"approve": True}).status_code == 403
-    assert pm.post(f"/lessons/{lesson_id}/review", json={"approve": True, "comment": "OK"}).json()["status"] == "APPROVED"
+    r = pm.post(f"/lessons/{lesson_id}/review", json={"approve": True, "comment": "OK"})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "SELF_APPROVAL"  # người soạn không tự duyệt
+    assert login("admin").post(f"/lessons/{lesson_id}/review", json={"approve": True, "comment": "OK"}).json()["status"] == "APPROVED"
     applied = pm.post(f"/lessons/{lesson_id}/apply").json()
     assert applied["status"] == "APPLIED" and applied["applied_prompt_version_id"]
     tpl = next(t for t in pm.get("/prompts/templates").json() if t["code"] == "A03.scene_prompt")
@@ -182,3 +184,74 @@ def test_critical_qc_finding_auto_creates_feedback(login, channels):
     assert any(c["severity"] == "CRITICAL" for c in r.json()["check"]["compliance"])
     r = pm.post(f"/projects/{pid}/script/approve", json={})
     assert r.status_code == 422 and r.json()["error"]["code"] == "COMPLIANCE_CRITICAL"
+
+
+def test_rca_suggest_learns_from_verified_cases(login):
+    """A08 học từ hồ sơ cùng loại đã kiểm chứng: trả về hồ sơ tương tự + nguyên nhân gốc đã chứng minh."""
+    _full_loop(login)
+    qc = login("qc")
+    u = _users(login("admin"))
+    c = qc.post("/feedback", json={"source": "QC", "category": "CHARACTER", "title": "Nhân vật đổi kiểu tóc giữa cảnh 50% (x)",
+                                   "evidence": EV, "evidence_class": "FACT"}).json()["case"]
+    qc.post(f"/feedback/{c['id']}/validate", json={"evidence_class": "FACT", "evidence": []})
+    qc.post(f"/feedback/{c['id']}/triage", json={"priority": "P2", "owner_id": u["PRODUCTION_MANAGER"]})
+    sug = qc.post(f"/feedback/{c['id']}/rca/suggest").json()
+    assert sug["evidence_class"] == "HYPOTHESIS" and len(sug["whys"]) == 5
+    assert sug["similar_cases"] and sug["similar_cases"][0]["root_cause"] == "Template prompt thiếu khối Character Lock cố định"
+    assert sug["root_cause"] == sug["similar_cases"][0]["root_cause"]
+    # Tìm kiếm có ký tự đặc biệt % _ được hiểu theo nghĩa đen
+    res = qc.get("/feedback", params={"q": "50% (x)"}).json()
+    assert [x["id"] for x in res["items"]] == [c["id"]]
+    assert qc.get("/feedback", params={"q": "%"}).json()["total"] == 1
+
+
+def test_capa_cancel_and_kpi_required(login):
+    qc, pm, admin = login("qc"), login("pm"), login("admin")
+    cid = _case_to_verify(login, title="Lệch nhân vật — kiểm tra KPI")
+    # KPI mục tiêu đã đặt → kết luận ĐẠT phải có KPI sau
+    r = qc.post(f"/feedback/{cid}/verify", json={"method": "Đo lại", "passed": True, "evidence": EV})
+    assert r.json()["error"]["code"] == "KPI_REQUIRED"
+    qc.post(f"/feedback/{cid}/verify", json={"method": "Đo lại", "kpi_after": 20, "passed": False, "evidence": EV})
+    # REOPENED: không thêm CAPA trực tiếp (trước đây CAPA PROPOSED bị kẹt vĩnh viễn)
+    r = pm.post(f"/feedback/{cid}/capa", json={"action_type": "CORRECTIVE", "description": "Thêm việc"})
+    assert r.status_code == 409
+    d = pm.post(f"/feedback/{cid}/restart", json={"target": "RCA_PENDING"}).json()
+    assert d["case"]["status"] == "RCA_PENDING"
+    d = pm.post(f"/feedback/{cid}/capa", json={"action_type": "PREVENTIVE", "description": "Đề xuất thừa"}).json()
+    extra = next(a for a in d["capa"] if a["description"] == "Đề xuất thừa")
+    assert pm.post(f"/feedback/capa/{extra['id']}/cancel", json={"reason": ""}).status_code == 422
+    d = pm.post(f"/feedback/capa/{extra['id']}/cancel", json={"reason": "Trùng với CAPA phòng ngừa đã có"}).json()
+    assert next(a for a in d["capa"] if a["id"] == extra["id"])["status"] == "CANCELLED"
+    assert any("Huỷ CAPA" in e["note"] for e in d["events"])
+    # Hoàn thành CAPA khi hồ sơ chưa ở bước thực hiện → bị chặn
+    pm.post(f"/feedback/{cid}/capa", json={"action_type": "CORRECTIVE", "description": "Tạo lại cảnh lần 2"})
+    d = admin.post(f"/feedback/{cid}/capa/approve", json={}).json()
+    new = next(a for a in d["capa"] if a["description"] == "Tạo lại cảnh lần 2")
+    r = pm.post(f"/feedback/capa/{new['id']}/complete", json={"evidence": EV})
+    assert r.status_code == 409
+    d = pm.post(f"/feedback/{cid}/start", json={}).json()
+    assert pm.post(f"/feedback/capa/{new['id']}/complete", json={"evidence": EV}).status_code == 200
+    assert pm.post(f"/feedback/{cid}/submit-verification", json={}).json()["case"]["status"] == "VERIFY_PENDING"
+
+
+def test_approved_lessons_flow_into_script_prompt(login, channels):
+    """Bài học đã duyệt (chưa áp dụng vào template) được A02 đọc khi viết kịch bản — hệ thống học thật."""
+    creator, admin, pm = login("creator"), login("admin"), login("pm")
+    x = creator.post("/lessons", json={"lesson_type": "EFFECTIVE_PROMPT", "title": "Hook câu hỏi",
+                                       "lesson": "Mở đầu bằng câu hỏi mẹ hay gặp giúp giữ chân 3 giây đầu",
+                                       "channel_id": channels["ANNGAN"]["id"]}).json()
+    creator.post(f"/lessons/{x['id']}/submit")
+    assert admin.post(f"/lessons/{x['id']}/review", json={"approve": True}).json()["status"] == "APPROVED"
+    p = create_project(pm, channels["ANNGAN"]["id"], topic="Bài học vào kịch bản", duration_sec=8, automation_level="MANUAL")
+    pm.post(f"/projects/{p['id']}/script/ideas")
+    from app.agents.models import AgentExecution
+    from app.db.session import SessionLocal
+    from sqlalchemy import select
+
+    db = SessionLocal()
+    try:
+        ex = db.scalars(select(AgentExecution).where(AgentExecution.agent_code == "A02")
+                        .order_by(AgentExecution.started_at.desc())).first()
+        assert x["code"] in ex.input_ref["prompt_version"]
+    finally:
+        db.close()
