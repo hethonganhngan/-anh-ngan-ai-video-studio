@@ -67,3 +67,12 @@ def test_server_down_is_retryable(monkeypatch):
     with pytest.raises(TTSError) as e:
         VieNeuLocalProvider().synthesize(TTSRequest(text="x", voice_id="v"))
     assert e.value.code == "PROVIDER_UNAVAILABLE" and e.value.retryable and "start-vieneu.ps1" in str(e.value)
+
+
+def test_speed_shortens_audio_keeping_wav(server):
+    ref = str(make_audio("chinh_chu.mp3", seconds=12))
+    r = VieNeuLocalProvider({"speed": 1.25}).synthesize(TTSRequest(text="Nhanh hơn", voice_id="VOI-2610-0004", reference_audio_path=ref))
+    assert r.duration_sec == 0.8 and r.meta["speed"] == 1.25
+    with wave.open(r.path, "rb") as w:
+        assert abs(w.getnframes() / w.getframerate() - 0.8) < 0.05
+    assert VieNeuLocalProvider({"speed": 9}).speed == 1.5  # giới hạn an toàn 0.75–1.5

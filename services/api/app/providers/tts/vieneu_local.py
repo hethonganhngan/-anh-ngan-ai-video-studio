@@ -30,6 +30,8 @@ class VieNeuLocalProvider(TTSProvider):
         self.base_url = self.config.get("base_url", DEFAULT_URL).rstrip("/")
         self.timeout = timeout
         self.unit_cost_vnd_per_sec = 0.0  # chạy trên máy — không tính phí
+        # VieNeu bỏ qua tham số tốc độ → tăng/giảm nhịp đọc sau khi đọc bằng atempo (giữ cao độ giọng)
+        self.speed = min(1.5, max(0.75, float(self.config.get("speed", 1.0))))
 
     def _url(self, path: str) -> str:
         if not re.match(r"^http://(127\.0\.0\.1|localhost):\d+$", self.base_url):
@@ -93,7 +95,23 @@ class VieNeuLocalProvider(TTSProvider):
             w.setframerate(SAMPLE_RATE)
             w.writeframes(r.content)
         dur = len(r.content) / 2 / SAMPLE_RATE
-        return TTSResult(path=path, duration_sec=round(dur, 2), simulated=False, meta={"voice": voice, "engine": "vieneu"})
+        if self.speed != 1.0:
+            path, dur = self._tempo(path), dur / self.speed
+        return TTSResult(path=path, duration_sec=round(dur, 2), simulated=False,
+                         meta={"voice": voice, "engine": "vieneu", "speed": self.speed})
+
+    def _tempo(self, path: str) -> str:
+        fd, out = tempfile.mkstemp(suffix=".wav")
+        os.close(fd)
+        cmd = [get_settings().ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error", "-i", path,
+               "-af", f"atempo={self.speed}", out]
+        try:
+            subprocess.run(cmd, check=True, timeout=120)
+        except (subprocess.SubprocessError, OSError) as e:
+            raise TTSError(f"Không chỉnh được tốc độ đọc: {e}", code="TEMPO_FAILED")
+        finally:
+            os.unlink(path)
+        return out
 
     def test_connection(self) -> str:
         try:

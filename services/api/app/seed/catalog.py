@@ -148,7 +148,7 @@ FLOW_CDP_CONFIG = {
 }
 
 VIENEU_CONFIG = {
-    "adapter": "vieneu_local", "base_url": "http://127.0.0.1:8200",
+    "adapter": "vieneu_local", "base_url": "http://127.0.0.1:8200", "speed": 1.15,
     "note": "Nhân bản giọng từ bản ghi âm chính chủ của Voice Profile (M04), chạy trên máy — không phí (D23). "
             "Chạy scripts/windows/start-vieneu.ps1, bấm 'Kiểm tra' rồi bật. Voice Profile: nhà cung cấp vieneu_local, "
             "tên giọng = mã Voice Profile.",
