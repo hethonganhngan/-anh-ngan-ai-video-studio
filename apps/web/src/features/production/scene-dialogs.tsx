@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
-import { FileUp, ShieldCheck } from "lucide-react";
+import { ExternalLink, FileUp, ShieldCheck, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FLOW_URL_DEFAULT, toFlowPrompt } from "@/features/production/flow-prompt";
 
 type ImportResult = { asset_id: string; job_id: string; warnings: string[] };
 
@@ -55,7 +56,46 @@ export function FlowImportDialog({ sceneId, sceneNo, onDone }: { sceneId: string
   );
 }
 
-const CRITERIA: [string, string][] = [["character", "Nhân vật"], ["setting", "Bối cảnh"], ["visual", "Hình ảnh"], ["voice", "Giọng nói"], ["lipsync", "Khẩu hình"], ["audio", "Âm thanh"], ["script", "Kịch bản"], ["brand", "Thương hiệu"], ["compliance", "Tuân thủ"], ["hook", "Hook"]];
+const FLOW_URL_KEY = "anngan.flowUrl";
+
+/** Mở Google Flow để tạo cảnh: chép prompt dạng 1 đoạn văn vào clipboard rồi mở dự án Flow (Flow không có API nhận prompt). */
+export function FlowCreateDialog({ sceneNo, promptText, durationSec }: { sceneNo: number; promptText: string; durationSec: number }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [url, setUrl] = useState(FLOW_URL_DEFAULT);
+  const show = () => {
+    setText(toFlowPrompt(promptText, durationSec));
+    try { setUrl(localStorage.getItem(FLOW_URL_KEY) || FLOW_URL_DEFAULT); } catch { /* trình duyệt chặn storage */ }
+    setOpen(true);
+  };
+  const go = async () => {
+    try { localStorage.setItem(FLOW_URL_KEY, url); } catch { /* bỏ qua */ }
+    window.open(url, "google-flow");
+    try { await navigator.clipboard.writeText(text); toast.success(`Đã chép prompt cảnh ${sceneNo} — dán (Ctrl+V) vào ô "Bạn muốn tạo những gì?" trên Flow`); }
+    catch { toast.error("Không chép tự động được — bôi đen prompt trong hộp này rồi Ctrl+C"); }
+  };
+  return (
+    <>
+      <Button size="sm" onClick={show} disabled={!promptText.trim()} data-testid={`flow-create-${sceneNo - 1}`}><Wand2 />Tạo trên Flow</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Tạo cảnh {sceneNo} trên Google Flow</DialogTitle>
+            <DialogDescription>Bấm “Chép prompt & mở Flow” → trên Flow gắn nhân vật (Thêm vào câu lệnh), dán prompt, chọn Video · 9:16 · {durationSec} giây · x1 rồi gửi. Xong tải MP4 về và bấm “Nhập từ Flow”.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Prompt cho Flow (sửa được trước khi chép)</Label><Textarea rows={9} value={text} onChange={(e) => setText(e.target.value)} data-testid="flow-prompt" /></div>
+            <div><Label>Link dự án Flow (lưu lại cho lần sau)</Label><Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={FLOW_URL_DEFAULT} data-testid="flow-url" /></div>
+            <p className="text-xs text-slate-500">Kiểm tra trước khi tải: đúng mặt & trang phục nhân vật, thoại tiếng Việt rõ, logo/chữ không méo, không cận cảnh bao bì sữa cho trẻ dưới 24 tháng hay thương hiệu đối thủ.</p>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Đóng</Button><Button onClick={go} disabled={!/^https:\/\//.test(url)} data-testid="flow-open"><ExternalLink />Chép prompt & mở Flow</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+const CRITERIA: [string, string][] =[["character", "Nhân vật"], ["setting", "Bối cảnh"], ["visual", "Hình ảnh"], ["voice", "Giọng nói"], ["lipsync", "Khẩu hình"], ["audio", "Âm thanh"], ["script", "Kịch bản"], ["brand", "Thương hiệu"], ["compliance", "Tuân thủ"], ["hook", "Hook"]];
 
 export function SceneQCDialog({ sceneId, sceneNo, onDone }: { sceneId: string; sceneNo: number; onDone: () => void }) {
   const [open, setOpen] = useState(false);

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -65,19 +65,29 @@ export default function CreatePage() {
     resolver: zodResolver(schema),
     defaultValues: {
       channel_id: "", topic: "", duration_sec: 32, quantity: 1, character_ids: [], scene_lock_ids: [], budget_limit: 0,
-      automation_level: "ASSISTED", video_provider_code: "mock", priority: "NORMAL", run_director: false,
+      automation_level: "AUTO", video_provider_code: "", priority: "NORMAL", run_director: true,
     },
   });
+  const autofilled = useRef({ voice: false, characters: false });
   const w = useWatch({ control });
   useEffect(() => {
     if (!w.channel_id && channels.data?.length) setValue("channel_id", channels.data[0].id);
   }, [channels.data, w.channel_id, setValue]);
   const availableProviders = (providers.data ?? []).filter((p) => p.available);
   useEffect(() => {
-    if (providers.data && !availableProviders.some((p) => p.code === w.video_provider_code) && availableProviders[0]) {
-      setValue("video_provider_code", availableProviders[0].code);
+    // Mặc định "nhập chủ đề là chạy": ưu tiên provider API thật đã sẵn sàng (tạo tự động), không thì provider khả dụng đầu tiên
+    if (providers.data && !availableProviders.some((p) => p.code === w.video_provider_code)) {
+      const pick = availableProviders.find((p) => p.is_real) ?? availableProviders[0];
+      if (pick) setValue("video_provider_code", pick.code);
     }
   }, [providers.data, availableProviders, w.video_provider_code, setValue]);
+  useEffect(() => {
+    // Giọng AI đã consent (TTS tự đọc được) và nhân vật đã khoá (có ảnh tham chiếu) — người dùng vẫn đổi được
+    const v = (voices.data ?? []).find((x) => x.provider_code !== "manual" && x.consent_status === "GRANTED");
+    if (v && !w.voice_profile_id && !autofilled.current.voice) { autofilled.current.voice = true; setValue("voice_profile_id", v.id); }
+    const c = (characters.data ?? []).find((x) => x.status === "LOCKED" && x.active_lock_id);
+    if (c && !(w.character_ids ?? []).length && !autofilled.current.characters) { autofilled.current.characters = true; setValue("character_ids", [c.id]); }
+  }, [voices.data, characters.data, w.voice_profile_id, w.character_ids, setValue]);
 
   const estKey = useMemo(() => [w.duration_sec, w.quantity, w.video_provider_code, w.budget_limit], [w.duration_sec, w.quantity, w.video_provider_code, w.budget_limit]);
   const estimate = useQuery<Estimate>({

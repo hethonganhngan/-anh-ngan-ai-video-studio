@@ -1,6 +1,6 @@
 # PROJECT STATUS — Ánh Ngân AI Video Studio V2.0
 
-**Cập nhật:** 2026-10-29 · **Giai đoạn hiện tại:** 6 — Verification ✅ hoàn tất · Triển khai Docker tự động ✅ · **Nhánh:** `main`
+**Cập nhật:** 2026-10-30 · **Giai đoạn hiện tại:** 6 — Verification ✅ hoàn tất · Triển khai Docker tự động ✅ · Chạy thật trên Windows (Veo/Vertex AI) · **Nhánh:** `windows-production-ai`
 
 ## Chức năng hoàn thành
 - 15 màn hình (M01–M15) + trang chi tiết dự án, chi tiết Feedback, tài khoản; sidebar 5 nhóm; trạng thái loading/empty/error/success/không có quyền.
@@ -12,6 +12,8 @@
 - Publishing (lịch, gói xuất file, URL, chặn DEMO tự đăng), Analytics (thủ công, CSV, insights, export), Dashboard CEO 14 KPI có công thức.
 - RBAC 8 vai trò × 55 quyền, CSRF, khoá tài khoản, rate limit, mã hoá secret, audit log, ngân sách + chặn cứng, backup/restore, DEMO/PRODUCTION tách dữ liệu.
 - Celery worker + beat (khôi phục tác vụ kẹt), Docker Compose (Postgres, Redis, API, worker, beat, web, Nginx, Prometheus) + script cài đặt tự động `scripts/install_server.sh` (đã chạy thật: 7 dịch vụ healthy), tài liệu đầy đủ, seed dữ liệu mẫu DEMO.
+
+- **Chế độ AUTO trọn gói (2026-10-30, D19/D20):** M02 nhập chủ đề → A01 viết kịch bản → tự duyệt nếu sạch (vi phạm CRITICAL thì dừng) → Veo trên Vertex AI tạo cảnh (ảnh Character Lock làm tham chiếu, cấm chữ/logo, không tiếng nói) → QC kỹ thuật → tự lồng giọng Voice Profile M04 → dựng có logo + phụ đề → dừng ở FINAL_QC. M05 có nút "Tạo trên Flow" (sao prompt + mở Google Flow) và đổi nhà cung cấp video của dự án.
 
 ## Kiểm thử (lần chạy cuối 2026-10-29)
 | Bộ | Kết quả |
@@ -34,6 +36,7 @@
 7. Dashboard lọc kỳ + ngày theo giờ Việt Nam; xoá API key nhà cung cấp; chặn rò rỉ API key tới host lạ; production từ chối khoá mặc định.
 
 ## Chưa hoàn thành / giới hạn đã biết
+- 2026-10-30 (Windows): pytest 117/118 — `test_production_refuses_default_secrets` lỗi do máy đọc `.env` thật (không liên quan mã). Chưa xác minh: `veo-3.1-fast-generate-001` có nhận `referenceImages` không (nếu 400 → đổi model Veo 3.1 thường ở M15); hạn mức Gemini TTS (lỗi lồng tiếng ghi vào `last_error`, video vẫn dựng).
 - Adapter mới (2026-10-29, chưa xác minh bằng key thật): Gemini LLM (A02/A08/A09, mặc định), Gemini Omni Flash (video), Gemini TTS (voice-over M06) — toàn bộ AI chỉ cần 1 key Gemini. Chạy thực tế trên Windows không Docker: `docs/deployment/WINDOWS.md` (pytest 101/101 trên Windows).
 - Chưa kết nối thật: Gemini LLM, Gemini Omni, Gemini TTS, Claude (tuỳ chọn), Veo/Vertex AI, Facebook/TikTok/YouTube/Zalo (cần quyền API). Xem `docs/deployment/INTEGRATIONS.md`.
 - S3 adapter chưa chạy với S3 thật (mặc định dùng volume). Build `api.Dockerfile` nền Debian cần quan sát lần đầu trên máy chủ thật.

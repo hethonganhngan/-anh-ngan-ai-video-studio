@@ -38,6 +38,11 @@ def build_real_provider(acc: ProviderAccount, key: str | None) -> VideoProvider:
 
         return GeminiOmniProvider(code=acc.provider_code, name=acc.name, api_key=key, config=acc.config,
                                   unit_cost_vnd_per_sec=acc.unit_cost)
+    if (acc.config or {}).get("adapter") == "veo_vertex":
+        from app.providers.video.veo_vertex import VeoVertexProvider
+
+        return VeoVertexProvider(code=acc.provider_code, name=acc.name, api_key=key, config=acc.config,
+                                 unit_cost_vnd_per_sec=acc.unit_cost)
     return RealAPIProvider(code=acc.provider_code, name=acc.name, api_key=key, config=acc.config)
 
 

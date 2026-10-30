@@ -246,10 +246,10 @@ def test_provider(pid: uuid.UUID, ctx: Ctx = Depends(require("admin.providers"))
             acc.connection_status, acc.last_error, acc.last_verified_at = "VERIFIED", None, datetime.now(timezone.utc)
         except Exception as e:  # noqa: BLE001
             acc.connection_status, acc.last_error = "ERROR", str(e)[:500]
-    elif (acc.config or {}).get("adapter") in ("gemini_omni", "gemini_tts", "gemini_llm"):
+    elif (acc.config or {}).get("adapter") in ("gemini_omni", "veo_vertex", "gemini_tts", "gemini_llm"):
         # Đọc thông tin model — không tạo nội dung nên không phát sinh chi phí
         try:
-            if acc.config["adapter"] == "gemini_omni":
+            if acc.config["adapter"] in ("gemini_omni", "veo_vertex"):
                 from app.providers.video.registry import build_real_provider
 
                 build_real_provider(acc, key).test_connection()

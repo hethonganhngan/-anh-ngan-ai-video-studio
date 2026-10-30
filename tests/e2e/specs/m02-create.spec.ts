@@ -19,6 +19,7 @@ test.describe("M02 — Trung tâm tạo video", () => {
     await page.getByTestId("f-topic").fill(topic);
     await page.getByTestId("f-cta").fill("Ghé Ánh Ngân để được tư vấn");
     await page.getByTestId("f-automation").selectOption("MANUAL");
+    await page.getByTestId("f-run-director").uncheck();  // mặc định bật (AUTO chạy một mạch) — test này chỉ kiểm tra tạo
     // Bấm 2 lần liên tiếp — idempotency key chống tạo trùng
     // Gửi form 2 lần liên tiếp đồng bộ (mô phỏng double-click) — cùng idempotency key
     await page.getByTestId("create-form").evaluate((f: HTMLFormElement) => { f.requestSubmit(); f.requestSubmit(); });

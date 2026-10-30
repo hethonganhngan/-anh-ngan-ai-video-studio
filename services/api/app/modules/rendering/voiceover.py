@@ -50,8 +50,10 @@ def _segments(ctx: Ctx, tl: dict) -> tuple[list[dict], float]:
     return out, round(t, 3)
 
 
-def generate_voiceover(ctx: Ctx, project_id, *, voice_profile_id=None, scene_volume: float = 0.35) -> dict:
-    ctx.require("editor.edit")
+def generate_voiceover(ctx: Ctx, project_id, *, voice_profile_id=None, scene_volume: float = 0.35,
+                       actor_check: bool = True) -> dict:
+    if actor_check:  # pipeline AUTO (worker) gọi với actor_check=False, giống start_render
+        ctx.require("editor.edit")
     p = lock_project(ctx, project_id)
     if p.status not in EDITABLE:
         raise InvalidTransition(f"Không tạo voice-over ở trạng thái {p.status}")
