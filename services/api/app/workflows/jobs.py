@@ -271,12 +271,13 @@ def _after_scene_change(ctx: Ctx, project) -> None:
                 sm.transition(ctx, project, "SCENE_QC", note="Cảnh được tạo lại — QC lại")
             result = run_scene_qc(ctx, project)
             if result["all_passed"] and project.automation_level != "MANUAL":
-                from app.modules.rendering.service import start_render, sync_timeline_clips
+                from app.modules.rendering.service import mute_provider_audio, start_render, sync_timeline_clips
 
                 sync_timeline_clips(ctx, project)  # timeline đã lưu phải dùng clip mới của cảnh vừa tạo lại
                 project.last_error = None
                 if project.automation_level == "AUTO":
                     _auto_voiceover(ctx, project)
+                mute_provider_audio(ctx, project)  # sau lồng tiếng: tiếng gốc Flow luôn tắt, kể cả khi lồng tiếng lỗi
                 start_render(ctx, project, timeline=None, actor_check=False)
         return
     if active:

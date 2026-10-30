@@ -79,3 +79,18 @@ def test_voiceover_falls_back_to_character_voice():
     assert _character_voice(ctx, types.SimpleNamespace(character_ids=["c1", "c2"])) == "v-chinh-chu"
     assert _character_voice(ctx, types.SimpleNamespace(character_ids=["c1", "c3"])) is None
     assert _character_voice(ctx, types.SimpleNamespace(character_ids=[])) is None
+
+
+def test_flow_audio_always_muted_even_without_voiceover():
+    """Hình từ Flow, giọng chính chủ ghép lúc dựng: tiếng gốc provider bị tắt kể cả khi lồng tiếng lỗi."""
+    import types
+
+    from app.modules.rendering.service import mute_provider_audio
+
+    acc = types.SimpleNamespace(config={"voiceover_scene_volume": 0.0})
+    ctx = types.SimpleNamespace(db=types.SimpleNamespace(scalar=lambda _q: acc))
+    p = types.SimpleNamespace(video_provider_code="flow_cdp", timeline={"clips": [{"asset_id": "a", "volume": 1.0}], "voiceover": []})
+    assert mute_provider_audio(ctx, p) == 0.0 and p.timeline["clips"][0]["volume"] == 0.0
+    acc.config = {}  # provider không cấu hình (vd. Veo) → giữ nguyên
+    p.timeline["clips"][0]["volume"] = 0.35
+    assert mute_provider_audio(ctx, p) is None and p.timeline["clips"][0]["volume"] == 0.35

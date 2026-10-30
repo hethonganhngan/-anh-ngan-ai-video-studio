@@ -47,6 +47,21 @@ def default_timeline(ctx: Ctx, p: Project) -> dict:
     }
 
 
+def mute_provider_audio(ctx: Ctx, p: Project) -> float | None:
+    """Provider có cấu hình `voiceover_scene_volume` (vd. Flow: hình do Flow tạo, giọng chính chủ ghép lúc dựng) →
+    đặt âm lượng mọi clip trên timeline theo giá trị đó, kể cả khi lồng tiếng lỗi, để giọng của provider không lọt vào video."""
+    from app.modules.administration.models import ProviderAccount
+
+    acc = ctx.db.scalar(select(ProviderAccount).where(ProviderAccount.provider_code == p.video_provider_code))
+    vol = (acc.config or {}).get("voiceover_scene_volume") if acc else None
+    if vol is None:
+        return None
+    tl = dict(p.timeline) if p.timeline else default_timeline(ctx, p)
+    tl["clips"] = [{**c, "volume": float(vol)} for c in tl.get("clips", [])]
+    p.timeline = tl
+    return float(vol)
+
+
 def sync_timeline_clips(ctx: Ctx, p: Project) -> list[int]:
     """Cảnh vừa được tạo lại/nhập clip mới → clip trên timeline đã lưu trỏ sang video đang chọn của cảnh
     (giữ nguyên âm lượng, bỏ cắt đầu/cuối vì clip mới khác clip cũ). Trả về số thứ tự các cảnh đã đổi."""

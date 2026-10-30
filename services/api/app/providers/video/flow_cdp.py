@@ -54,12 +54,17 @@ def to_flow_prompt(prompt_text: str, duration_sec: int, speech_in_video: bool) -
         f"Nhân vật: {who.strip() or 'Nhân vật'}, giữ nguyên khuôn mặt và trang phục theo nhân vật đã lưu trong dự án; "
         f"thần thái {manner.split(';')[0].strip() or 'ấm áp, nhẹ nhàng'}.",
     ]
-    for key, label in (("LOẠI CẢNH", "Kiểu cảnh"), ("HÀNH ĐỘNG", "Hành động"), ("BỐI CẢNH", "Bối cảnh"),
-                       ("MÁY QUAY", "Máy quay"), ("ÁNH SÁNG", "Ánh sáng"), ("ÂM THANH", "Âm thanh")):
+    sections = [("LOẠI CẢNH", "Kiểu cảnh"), ("HÀNH ĐỘNG", "Hành động"), ("BỐI CẢNH", "Bối cảnh"),
+                ("MÁY QUAY", "Máy quay"), ("ÁNH SÁNG", "Ánh sáng")]
+    if speech_in_video:  # giọng do Flow đọc; ngược lại mục âm thanh ("giọng thoại rõ…") làm Flow tự tạo tiếng nói
+        sections.append(("ÂM THANH", "Âm thanh"))
+    for key, label in sections:
         if get(key):
             out.append(f"{label}: {get(key)}.")
     if get("THOẠI"):
-        out.append(f"Lời thoại: {get('THOẠI').replace(' / ', ' ')}")
+        dialogue = get("THOẠI").replace(" / ", " ")
+        out.append(f"Lời thoại: {dialogue}" if speech_in_video
+                   else f"Khẩu hình nhân vật mấp máy theo câu (không phát thành tiếng): {dialogue}")
     if get("NEGATIVE PROMPT"):
         out.append(f"Tránh: {get('NEGATIVE PROMPT')}.")
     if not parts:  # prompt tự do (không theo 9 mục)

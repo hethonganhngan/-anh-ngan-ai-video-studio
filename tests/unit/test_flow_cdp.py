@@ -17,9 +17,12 @@ def test_prompt_one_paragraph_without_lock_tags():
     p = to_flow_prompt(PROMPT, 8, speech_in_video=False)
     assert p.startswith("Tạo 1 video (không tạo hình ảnh) dọc 9:16, 8 giây")
     assert "Nhân vật: Mẹ Ánh Ngân," in p and "thần thái ấm áp" in p and "CHR-" not in p and "Character Lock" not in p
-    assert "Lời thoại: Chào cả nhà hôm nay mình nói về sữa" in p and "Tránh: logo sai, chữ méo." in p
+    # Flow chỉ tạo hình: khẩu hình theo thoại nhưng không phát tiếng, bỏ mục âm thanh "giọng thoại rõ"
+    assert "không phát thành tiếng): Chào cả nhà hôm nay mình nói về sữa" in p and "Tránh: logo sai, chữ méo." in p
+    assert "Lời thoại:" not in p and "Âm thanh:" not in p
     assert F.NO_TEXT in p and F.SILENT_SPEECH in p and "\n" not in p
-    assert F.SILENT_SPEECH not in to_flow_prompt(PROMPT, 8, speech_in_video=True)
+    spoken = to_flow_prompt(PROMPT + "\n[7. ÂM THANH] giọng thoại rõ", 8, speech_in_video=True)
+    assert F.SILENT_SPEECH not in spoken and "Lời thoại: Chào cả nhà" in spoken and "Âm thanh: giọng thoại rõ." in spoken
 
 
 def test_status_and_result_from_job_id():
