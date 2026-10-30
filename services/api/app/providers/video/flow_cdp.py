@@ -26,6 +26,8 @@ OK, MANUAL = "flowcdp:ok:", "flowcdp:manual:"
 LOCK_KEY = "anngan:flow_cdp:lock"
 CHALLENGE = re.compile(r"accounts\.google\.com|/sorry/|recaptcha|challenge", re.I)
 SECTION = re.compile(r"^\[\d+\.\s*([^\]]+)\]\s*(.*)$", re.MULTILINE)
+VOICE_ONLY = ("Âm thanh: chỉ có giọng nói của nhân vật, nói tự nhiên, rõ từng chữ, có khoảng lặng ngắn trước khi nói; "
+              "không nhạc nền, không tiếng ồn xung quanh.")
 NOTE = re.compile(r"^Lưu ý:\s*(.+)$", re.MULTILINE)
 LOCK_TAG = re.compile(r"\[(Character|Scene) Lock[^\]]*\]|\b(CHR|SCN)-\d{4}-\d{4}\s*")
 
@@ -58,11 +60,11 @@ def to_flow_prompt(prompt_text: str, duration_sec: int, speech_in_video: bool) -
     ]
     sections = [("LOẠI CẢNH", "Kiểu cảnh"), ("HÀNH ĐỘNG", "Hành động"), ("BỐI CẢNH", "Bối cảnh"),
                 ("MÁY QUAY", "Máy quay"), ("ÁNH SÁNG", "Ánh sáng")]
-    if speech_in_video:  # giọng do Flow đọc; ngược lại mục âm thanh ("giọng thoại rõ…") làm Flow tự tạo tiếng nói
-        sections.append(("ÂM THANH", "Âm thanh"))
     for key, label in sections:
         if get(key):
             out.append(f"{label}: {get(key)}.")
+    if speech_in_video:  # tiếng Flow chỉ làm mốc khẩu hình (tắt khi dựng) → chỉ giọng nói, không nhạc để đo được
+        out.append(VOICE_ONLY)
     if get("THOẠI"):
         dialogue = get("THOẠI").replace(" / ", " ")
         out.append(f"Lời thoại: {dialogue}" if speech_in_video

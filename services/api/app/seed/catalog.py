@@ -159,7 +159,7 @@ VEO_VERTEX_CONFIG = {
 FLOW_CDP_CONFIG = {
     "adapter": "flow_cdp", "cdp_url": "http://127.0.0.1:9222",
     "project_url": "https://flow.google.com/project/6ae396ef-7905-495b-90b1-564042d940cd",
-    "timeout_min": 15, "speech_in_video": False, "voiceover_scene_volume": 0.0,
+    "timeout_min": 15, "speech_in_video": True, "voiceover_scene_volume": 0.0,  # tiếng Flow = mốc khẩu hình, tắt khi dựng
     "ingredients": ["MeAnhNgan", "Cửa hàng Ánh Ngân"], "max_duration_sec": 8, "supported_aspects": ["9:16", "16:9"],
     "note": "THỬ NGHIỆM (D21): Playwright điều khiển Chrome đã đăng nhập Flow qua CDP, dùng lượt của gói Google — "
             "không tốn phí API. Chạy scripts/windows/start-flow-chrome.ps1, đăng nhập Flow 1 lần trong cửa sổ đó, "

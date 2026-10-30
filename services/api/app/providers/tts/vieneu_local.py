@@ -13,7 +13,7 @@ import wave
 
 import httpx
 from app.core.config import get_settings
-from app.providers.tts.base import TTSError, TTSProvider, TTSRequest, TTSResult
+from app.providers.tts.base import TTSError, TTSProvider, TTSRequest, TTSResult, VoiceOption
 
 DEFAULT_URL = "http://127.0.0.1:8200"
 SAMPLE_RATE = 24000
@@ -111,6 +111,20 @@ class VieNeuLocalProvider(TTSProvider):
             raise TTSError(f"Không chỉnh được tốc độ đọc: {e}", code="TEMPO_FAILED")
         finally:
             os.unlink(path)
+        return out
+
+    def voice_options(self) -> list[VoiceOption]:
+        """Giọng dựng sẵn của VieNeu (mô tả dạng "Nữ · Nam · …"); bỏ giọng nhân bản (không có giới tính)."""
+        try:
+            data = httpx.get(self._url("/v1/voices"), timeout=10).json().get("data") or []
+        except (httpx.HTTPError, ValueError, TTSError):
+            return []
+        out = []
+        for v in data:
+            if v.get("gender") not in ("female", "male"):
+                continue
+            bits = [b.strip() for b in (v.get("description") or "").split("·")]
+            out.append(VoiceOption(v["id"], v["gender"], bits[1] if len(bits) > 1 else ""))
         return out
 
     def test_connection(self) -> str:

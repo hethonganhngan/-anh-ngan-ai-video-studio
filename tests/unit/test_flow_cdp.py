@@ -24,7 +24,9 @@ def test_prompt_one_paragraph_without_lock_tags():
     assert "Lời thoại:" not in p and "Âm thanh:" not in p
     assert F.NO_TEXT in p and F.SILENT_SPEECH in p and "\n" not in p
     spoken = to_flow_prompt(PROMPT + "\n[7. ÂM THANH] giọng thoại rõ", 8, speech_in_video=True)
-    assert F.SILENT_SPEECH not in spoken and "Lời thoại: Chào cả nhà" in spoken and "Âm thanh: giọng thoại rõ." in spoken
+    # tiếng Flow chỉ làm mốc khẩu hình → bỏ nhạc nền của mục âm thanh, chỉ giữ giọng nói
+    assert F.SILENT_SPEECH not in spoken and "Lời thoại: Chào cả nhà" in spoken and F.VOICE_ONLY in spoken
+    assert "giọng thoại rõ" not in spoken
 
 
 def test_status_and_result_from_job_id():
