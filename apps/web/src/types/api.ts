@@ -123,7 +123,7 @@ export type Lesson = {
 
 export type Publication = {
   id: string; project_id: string; render_id: string | null; channel_id: string; platform: string; caption: string;
-  hashtags: string[]; scheduled_at: string | null; published_at: string | null; post_url: string | null;
+  hashtags: string[]; scheduled_at: string | null; published_at: string | null; post_url: string | null; external_id: string | null;
   publish_mode: string; status: string; export_asset_id: string | null; error_message: string | null; data_mode: string;
   created_at: string;
 };

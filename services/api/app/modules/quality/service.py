@@ -352,6 +352,10 @@ def approve(ctx: Ctx, project_id, decision: str, comment: str) -> Approval:
         p.approved_at = _now()
         render.status = "APPROVED"
         sm.transition(ctx, p, "APPROVED", note=f"Phê duyệt bởi {ctx.actor.label}. {comment}".strip())
+        if get_setting(ctx.db, "publishing.policy").get("auto_prepare"):
+            from app.workflows.dispatch import defer
+
+            defer(ctx.db, "anngan.publishing.auto_prepare", str(p.id), ctx.mode)  # M10 tự động, chạy sau commit
     else:
         render.status = "QC_FAILED"
         sm.transition(ctx, p, "FINAL_QC", note=f"Từ chối: {comment}")

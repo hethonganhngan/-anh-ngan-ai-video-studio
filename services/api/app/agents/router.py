@@ -1,8 +1,11 @@
 """M14 — AI Agent Control Center."""
+import re
+import unicodedata
+import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from app.agents.models import AgentConfig, AgentExecution
+from app.agents.models import AgentConfig, AgentExecution, AgentSkill
 from app.agents.registry import AGENTS
 from app.agents.runner import sweep_abandoned
 from app.api.deps import require
@@ -10,7 +13,7 @@ from app.api.schemas import ORM, Page
 from app.core import audit
 from app.core.context import Ctx
 from app.core.errors import NotFound, ValidationFailed
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -97,6 +100,133 @@ def executions(agent_code: str | None = None, status: str | None = None, project
     items = [ExecOut.model_validate({**{c.name: getattr(r, c.name) for c in AgentExecution.__table__.columns},
                                      "id": str(r.id), "project_id": str(r.project_id) if r.project_id else None}) for r in rows]
     return Page(items=items, total=total, page=page, page_size=page_size)
+
+
+# ---------- Skills: gói hướng dẫn cắm vào agent dùng LLM, bật/tắt từng skill ----------
+MAX_SKILL_CONTENT = 60000
+FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.S)
+
+
+class SkillIn(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    description: str = Field(default="", max_length=2000)
+    content: str = Field(min_length=10, max_length=MAX_SKILL_CONTENT)
+    agent_codes: list[str] = Field(default_factory=list)
+    is_enabled: bool = True
+    sort_order: int = Field(default=100, ge=0, le=10000)
+
+
+class SkillPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+    content: str | None = Field(default=None, min_length=10, max_length=MAX_SKILL_CONTENT)
+    agent_codes: list[str] | None = None
+    is_enabled: bool | None = None
+    sort_order: int | None = Field(default=None, ge=0, le=10000)
+
+
+def _skill(s: AgentSkill) -> dict:
+    return {"id": str(s.id), "code": s.code, "name": s.name, "description": s.description, "content": s.content,
+            "agent_codes": s.agent_codes or [], "is_enabled": s.is_enabled, "source": s.source, "sort_order": s.sort_order,
+            "chars": len(s.content), "updated_at": s.updated_at.isoformat() if s.updated_at else None}
+
+
+def _check_agents(codes: list[str]) -> list[str]:
+    bad = [c for c in codes if not AGENTS.get(c, {}).get("uses_llm")]
+    if bad:
+        raise ValidationFailed(f"Chỉ cắm skill vào agent dùng LLM; {', '.join(bad)} là rule-engine hoặc không tồn tại",
+                               code="SKILL_AGENT_NOT_LLM")
+    return sorted(set(codes))
+
+
+def _slug(name: str, db) -> str:
+    base = unicodedata.normalize("NFKD", name.replace("đ", "d").replace("Đ", "D")).encode("ascii", "ignore").decode()
+    base = re.sub(r"[^a-z0-9]+", "-", base.lower()).strip("-")[:60] or "skill"
+    code, n = base, 2
+    while db.scalar(select(AgentSkill.id).where(AgentSkill.code == code)):
+        code, n = f"{base}-{n}", n + 1
+    return code
+
+
+def parse_skill_md(text: str, filename: str = "") -> dict:
+    """SKILL.md: frontmatter YAML (name, description) + nội dung; không có frontmatter → tên theo tên file."""
+    meta, body = {}, text
+    m = FRONTMATTER.match(text)
+    if m:
+        body = text[m.end():]
+        for line in m.group(1).splitlines():
+            k, sep, v = line.partition(":")
+            if sep and k.strip() in ("name", "description"):
+                meta[k.strip()] = v.strip().strip("'\"")
+    name = meta.get("name") or re.sub(r"\.(md|markdown|txt)$", "", filename or "", flags=re.I) or "Skill"
+    return {"name": name[:160], "description": meta.get("description", "")[:2000], "content": body.strip()}
+
+
+def _get_skill(ctx: Ctx, skill_id: uuid.UUID) -> AgentSkill:
+    s = ctx.db.get(AgentSkill, skill_id)
+    if s is None:
+        raise NotFound("Không tìm thấy skill")
+    return s
+
+
+@router.get("/skills")
+def list_skills(ctx: Ctx = Depends(require("agent.view"))):
+    rows = ctx.db.scalars(select(AgentSkill).order_by(AgentSkill.sort_order, AgentSkill.name)).all()
+    return [_skill(s) for s in rows]
+
+
+@router.post("/skills", status_code=201)
+def create_skill(data: SkillIn, ctx: Ctx = Depends(require("agent.manage"))):
+    s = AgentSkill(code=_slug(data.name, ctx.db), name=data.name.strip(), description=data.description.strip(),
+                   content=data.content.strip(), agent_codes=_check_agents(data.agent_codes), is_enabled=data.is_enabled,
+                   sort_order=data.sort_order, source="MANUAL")
+    ctx.db.add(s)
+    ctx.db.flush()
+    audit.record(ctx, "agent.skill_create", "agent_skill", s.id, after={"code": s.code, "agents": s.agent_codes})
+    ctx.db.commit()
+    return _skill(s)
+
+
+@router.post("/skills/import", status_code=201)
+async def import_skill(file: UploadFile = File(...), agent_codes: str = Form(""),
+                       ctx: Ctx = Depends(require("agent.manage"))):
+    raw = await file.read(MAX_SKILL_CONTENT * 4 + 1)
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise ValidationFailed("File skill phải là văn bản UTF-8 (.md)", code="SKILL_NOT_TEXT")
+    parsed = parse_skill_md(text, file.filename or "")
+    data = SkillIn(**parsed, agent_codes=[c for c in agent_codes.split(",") if c.strip()])
+    s = AgentSkill(code=_slug(data.name, ctx.db), name=data.name, description=data.description, content=data.content,
+                   agent_codes=_check_agents([c.strip() for c in data.agent_codes]), is_enabled=True, source="UPLOAD")
+    ctx.db.add(s)
+    ctx.db.flush()
+    audit.record(ctx, "agent.skill_import", "agent_skill", s.id, after={"code": s.code, "file": file.filename})
+    ctx.db.commit()
+    return _skill(s)
+
+
+@router.patch("/skills/{skill_id}")
+def update_skill(skill_id: uuid.UUID, data: SkillPatch, ctx: Ctx = Depends(require("agent.manage"))):
+    s = _get_skill(ctx, skill_id)
+    ch = data.model_dump(exclude_unset=True)
+    if "agent_codes" in ch:
+        ch["agent_codes"] = _check_agents(ch["agent_codes"] or [])
+    before = {k: getattr(s, k) for k in ch if k != "content"}
+    for k, v in ch.items():
+        setattr(s, k, v.strip() if isinstance(v, str) else v)
+    audit.record(ctx, "agent.skill_update", "agent_skill", s.id, before=before,
+                 after={k: v for k, v in ch.items() if k != "content"} | ({"content_chars": len(s.content)} if "content" in ch else {}))
+    ctx.db.commit()
+    return _skill(s)
+
+
+@router.delete("/skills/{skill_id}", status_code=204)
+def delete_skill(skill_id: uuid.UUID, ctx: Ctx = Depends(require("agent.manage"))):
+    s = _get_skill(ctx, skill_id)
+    audit.record(ctx, "agent.skill_delete", "agent_skill", s.id, before={"code": s.code, "agents": s.agent_codes})
+    ctx.db.delete(s)
+    ctx.db.commit()
 
 
 @router.get("/{code}")

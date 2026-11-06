@@ -63,6 +63,13 @@ def update_character(cid: uuid.UUID, data: CharacterPatch, ctx: Ctx = Depends(re
     return c
 
 
+@router.delete("/characters/{cid}")
+def delete_character(cid: uuid.UUID, ctx: Ctx = Depends(require("character.edit"))):
+    c = service.delete_character(ctx, cid)
+    ctx.db.commit()
+    return {"deleted": c.code}
+
+
 @router.post("/characters/{cid}/references", response_model=ReferenceOut, status_code=201)
 def add_reference(cid: uuid.UUID, data: ReferenceIn, ctx: Ctx = Depends(require("character.edit"))):
     r = service.add_reference(ctx, cid, data.ref_type, data.asset_id, data.note)
@@ -110,6 +117,13 @@ def update_voice(vid: uuid.UUID, data: VoicePatch, ctx: Ctx = Depends(require("c
     v = service.update_voice(ctx, vid, data.model_dump(exclude_unset=True))
     ctx.db.commit()
     return v
+
+
+@router.delete("/voices/{vid}")
+def delete_voice(vid: uuid.UUID, ctx: Ctx = Depends(require("character.edit"))):
+    v = service.delete_voice(ctx, vid)
+    ctx.db.commit()
+    return {"deleted": v.code}
 
 
 @router.post("/voices/{vid}/locks", response_model=LockOut, status_code=201)

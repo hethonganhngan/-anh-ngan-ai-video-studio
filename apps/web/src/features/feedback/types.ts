@@ -9,7 +9,10 @@ export type FeedbackDetail = {
   overdue: boolean;
   allowed_next: string[];
   lesson_id?: string | null;
+  lessons?: { id: string; code: string; title: string; status: string }[];
 };
+
+export type SimilarCase = { id: string; code: string; title: string; root_cause: string; cause_category: string; capa: string[] };
 
 export type FeedbackMeta = {
   statuses: string[]; steps: string[]; sources: string[]; categories: string[]; priorities: string[]; evidence_classes: string[];

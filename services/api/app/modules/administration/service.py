@@ -23,6 +23,8 @@ DEFAULT_SETTINGS: dict[str, dict] = {
     "qc.policy": {"min_total": 98, "require_human_review": True, "blocking_severities": ["CRITICAL", "MAJOR"]},
     "generation.policy": {"max_retries": 3, "scene_seconds": 8, "aspect_ratio": "9:16", "max_dialogue_lines": 2},
     "notifications": {"budget_alert": True, "qc_failed": True, "feedback_p0": True, "email_enabled": False},
+    # M10 tự động: video được duyệt → tự soạn bài đăng, lịch, gói xuất file; Facebook chỉ gửi BẢN NHÁP chờ duyệt
+    "publishing.policy": {"auto_prepare": True, "facebook_drafts": True},
     "organization": {"name": "Hệ thống Sữa Ánh Ngân", "currency": "VND", "timezone": "Asia/Ho_Chi_Minh"},
 }
 

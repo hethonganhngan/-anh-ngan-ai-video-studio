@@ -7,7 +7,7 @@ import tempfile
 import wave
 
 from app.providers.google_genai import GeminiClient, GeminiError, decode_to_file, find_output
-from app.providers.tts.base import TTSError, TTSProvider, TTSRequest, TTSResult
+from app.providers.tts.base import TTSError, TTSProvider, TTSRequest, TTSResult, VoiceOption
 
 DEFAULT_MODEL = "gemini-3.8-flash-tts"
 DEFAULT_VOICE = "Kore"
@@ -15,6 +15,8 @@ VOICES = ["Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede",
           "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar",
           "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia",
           "Sadaltager", "Sulafat"]
+FEMALE_VOICES = {"Zephyr", "Kore", "Leda", "Aoede", "Callirrhoe", "Autonoe", "Despina", "Erinome", "Laomedeia",
+                 "Achernar", "Gacrux", "Pulcherrima", "Vindemiatrix", "Sulafat"}
 
 
 class GeminiTTSProvider(TTSProvider):
@@ -33,6 +35,9 @@ class GeminiTTSProvider(TTSProvider):
             return GeminiClient(self.api_key, timeout=120)
         except GeminiError as e:
             raise TTSError(str(e), code=e.code)
+
+    def voice_options(self) -> list[VoiceOption]:
+        return [VoiceOption(v, "female" if v in FEMALE_VOICES else "male") for v in VOICES]
 
     def synthesize(self, req: TTSRequest) -> TTSResult:
         voice = req.voice_id if req.voice_id in VOICES else self.config.get("default_voice", DEFAULT_VOICE)

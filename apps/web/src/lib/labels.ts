@@ -79,6 +79,7 @@ export const PUB_STATUS: Record<string, { label: string; variant: BadgeVariant }
   SCHEDULED: { label: "Đã lên lịch", variant: "default" },
   PUBLISH_QUEUED: { label: "Chờ đăng", variant: "yellow" },
   EXPORTED: { label: "Đã xuất file", variant: "purple" },
+  PENDING_REVIEW: { label: "Nháp FB — chờ duyệt", variant: "orange" },
   PUBLISHED: { label: "Đã đăng", variant: "green" },
   FAILED: { label: "Lỗi", variant: "red" },
   CANCELLED: { label: "Đã huỷ", variant: "gray" },

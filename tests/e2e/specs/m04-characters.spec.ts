@@ -83,6 +83,17 @@ test.describe("M04 — Character & Voice Studio", () => {
     const v = (await call<any[]>(admin, "get", "/voices")).find((x) => x.name === vname);
     expect(v.status).toBe("LOCKED");
     expect(v.audio_reference_asset_id).toBeTruthy();
+    // Sửa → lưu; Xoá phải gõ đúng mã giọng
+    await page.getByTestId("voice-edit").click();
+    await page.getByTestId("voice-name").fill(`${vname} sửa`);
+    await page.getByTestId("voice-submit").click();
+    await expect(page.getByTestId("voice-summary")).toBeVisible();
+    await expect(page.getByTestId("voice-detail")).toContainText(`${vname} sửa`);
+    await page.getByTestId("voice-delete").click();
+    await page.getByTestId("confirm-input").fill(v.code);
+    await page.getByTestId("confirm-ok").click();
+    await expect(page.getByText("Đã xoá giọng nói")).toBeVisible();
+    expect((await call<any[]>(admin, "get", "/voices")).some((x) => x.id === v.id)).toBe(false);
 
     await page.getByTestId("tab-scene-locks").click();
     const sname = `Quầy tư vấn E2E ${Date.now()}`;

@@ -83,7 +83,7 @@ def test_full_pipeline(login, channels):
     assert pub.post(f"/projects/{pid}/approve", json={"decision": "APPROVED"}).status_code == 403
     r = pm.post(f"/projects/{pid}/approve", json={"decision": "APPROVED", "comment": "Phát hành"})
     assert r.status_code == 200, r.text
-    assert pm.get(f"/projects/{pid}").json()["status"] == "APPROVED"
+    assert pm.get(f"/projects/{pid}").json()["status"] == "PUBLISH_QUEUED"  # M10 tự chuẩn bị bài đăng + gói xuất (D29)
 
     # M10: lịch đăng, caption bị bộ lọc tuân thủ chặn
     bad = pub.post("/publications", json={"project_id": pid, "platform": "FACEBOOK", "caption": "Sữa tốt nhất cho bé"})

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
 
-from app.agents.models import AgentConfig, AgentExecution
+from app.agents.models import AgentConfig, AgentExecution, AgentSkill
 from app.core.context import Ctx
 from app.core.errors import AppError, Forbidden, NotFound
 from app.core.independent import persist
@@ -38,6 +38,42 @@ class AgentLimitExceeded(AppError):
 class LLMNotConnected(AppError):
     status_code = 409
     code = "LLM_NOT_CONNECTED"
+
+
+MAX_SKILL_CHARS = 60000  # tổng nội dung skill ghép vào 1 lần gọi LLM
+
+
+def enabled_skills(db, agent_code: str) -> list[AgentSkill]:
+    """Skill đang bật và được gắn cho agent, theo thứ tự ưu tiên."""
+    rows = db.scalars(select(AgentSkill).where(AgentSkill.is_enabled.is_(True))
+                      .order_by(AgentSkill.sort_order, AgentSkill.name)).all()
+    return [s for s in rows if agent_code in (s.agent_codes or [])]
+
+
+def skills_block(skills: list[AgentSkill]) -> str:
+    parts, used = [], 0
+    for s in skills:
+        body = f"## Skill: {s.name}\n{s.content.strip()}"
+        if used + len(body) > MAX_SKILL_CHARS:
+            break
+        parts.append(body)
+        used += len(body)
+    return ("Bạn được trang bị các skill dưới đây — làm theo khi phù hợp. Nếu mâu thuẫn với yêu cầu, schema đầu ra "
+            "hoặc quy tắc tuân thủ của hệ thống thì quy tắc hệ thống được ưu tiên.\n\n" + "\n\n".join(parts))
+
+
+class SkilledLLM:
+    """Bọc LLM provider: ghép skill đang bật vào system prompt; mọi thuộc tính khác chuyển thẳng cho provider gốc."""
+
+    def __init__(self, llm: LLMProvider, skills: list[AgentSkill]):
+        self._llm, self._block = llm, skills_block(skills)
+        self.skill_codes = [s.code for s in skills]
+
+    def __getattr__(self, name):
+        return getattr(self._llm, name)
+
+    def complete_json(self, *, system: str, **kw) -> LLMResult:
+        return self._llm.complete_json(system=f"{self._block}\n\n---\n\n{system}", **kw)
 
 
 @dataclass
@@ -93,6 +129,10 @@ def run_agent(ctx: Ctx, agent_code: str, action: str, fn: Callable[[LLMProvider 
         raise AgentLimitExceeded(f"{cfg.name} đã đạt giới hạn {cfg.max_runs_per_day} lần chạy/ngày")
 
     llm = resolve_llm(ctx, cfg) if needs_llm else None
+    skills = enabled_skills(db, agent_code) if llm is not None else []
+    if skills:
+        llm = SkilledLLM(llm, skills)
+        input_ref = {**(input_ref or {}), "skills": llm.skill_codes}
     if llm is not None and llm.is_real:
         # Chặn trước khi gọi API thật nếu chi phí tối đa của lần chạy làm vượt ngân sách
         admin.check_budget(ctx, estimated=Decimal(cfg.max_cost_per_run), project=project, provider_code=llm.code)

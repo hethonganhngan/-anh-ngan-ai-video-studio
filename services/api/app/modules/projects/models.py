@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from app.db.base import Base, DataModeMixin, SoftDeleteMixin, TimestampMixin, UUIDMixin, utcnow
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -15,6 +15,8 @@ class Channel(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     name: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text, default="")
     platforms: Mapped[list] = mapped_column(JSONB, default=list)  # ["FACEBOOK","TIKTOK","YOUTUBE","ZALO"]
+    # Đích đăng theo nền tảng, vd. {"FACEBOOK": {"page_id": "...", "page_name": "..."}} — kênh M13 gắn Fanpage riêng
+    publish_targets: Mapped[dict] = mapped_column(JSONB, default=dict, server_default=text("'{}'::jsonb"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     brand_profile: Mapped["BrandProfile | None"] = relationship(back_populates="channel", uselist=False, lazy="selectin")
 

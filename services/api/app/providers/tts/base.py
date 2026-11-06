@@ -8,6 +8,7 @@ class TTSRequest:
     text: str
     voice_id: str = ""
     style: str = ""  # mô tả giọng: vùng miền, sắc thái, tốc độ
+    reference_audio_path: str = ""  # bản ghi âm chính chủ (Voice Lock) cho provider nhân bản giọng
 
 
 @dataclass
@@ -16,6 +17,14 @@ class TTSResult:
     duration_sec: float
     simulated: bool = True
     meta: dict = field(default_factory=dict)
+
+
+@dataclass
+class VoiceOption:
+    """Giọng dựng sẵn của provider — dùng cho vai phụ (giọng nhân vật chính vẫn theo Voice Lock)."""
+    id: str
+    gender: str = ""  # female | male | ""
+    region: str = ""  # Bắc | Trung | Nam | ""
 
 
 class TTSError(Exception):
@@ -33,6 +42,10 @@ class TTSProvider(ABC):
 
     @abstractmethod
     def synthesize(self, req: TTSRequest) -> TTSResult: ...
+
+    def voice_options(self) -> list[VoiceOption]:
+        """Giọng dựng sẵn để đọc vai phụ. [] = provider không có giọng khác → mọi vai dùng chung giọng chính."""
+        return []
 
     def estimate_seconds(self, text: str) -> float:
         return max(1.0, len(text) / 14.0)  # ~14 ký tự/giây tiếng Việt đọc vừa phải

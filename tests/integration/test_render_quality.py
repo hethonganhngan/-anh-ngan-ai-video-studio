@@ -123,7 +123,7 @@ def test_final_qc_rules_and_approval(login, channels):
         assert pm.get(f"/projects/{pid}").json()["status"] == "FINAL_QC"
         qc.post(f"/projects/{pid}/qc/final", json={"scores": scores, "notes": "Đạt lần 2"})
         assert admin.post(f"/projects/{pid}/approve", json={"decision": "APPROVED", "comment": "CEO duyệt"}).status_code == 200
-        assert pm.get(f"/projects/{pid}").json()["status"] == "APPROVED"
+        assert pm.get(f"/projects/{pid}").json()["status"] == "PUBLISH_QUEUED"  # M10 tự chuẩn bị đăng (D29)
 
 
 def test_render_failure_retry_and_failed_state(login, channels, monkeypatch):

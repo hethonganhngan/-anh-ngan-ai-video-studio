@@ -18,6 +18,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate, formatNumber, formatVND } from "@/lib/utils";
 import type { Page } from "@/types/api";
+import { SkillsCard } from "@/features/agents/skills";
 
 type Agent = {
   code: string; name: string; role: string; uses_llm: boolean; provider_code: string; model: string; is_enabled: boolean;
@@ -181,6 +182,7 @@ export default function AgentsPage() {
           </Card>
         )}
       </QueryView>
+      {q.data && <SkillsCard agents={q.data.filter((a) => a.uses_llm).map((a) => ({ code: a.code, name: a.name }))} />}
       <Executions />
       {cfg && <ConfigDialog a={cfg} onClose={() => setCfg(null)} />}
     </RequirePermission>

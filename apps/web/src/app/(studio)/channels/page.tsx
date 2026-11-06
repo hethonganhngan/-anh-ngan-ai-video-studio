@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PLATFORMS } from "@/lib/labels";
 import { cn, formatDate } from "@/lib/utils";
+import { FacebookConnect, type FbTarget } from "@/features/channels/facebook-connect";
 
 type Brand = {
   slogan: string; brand_promise: string; big_idea: string; brand_voice: string[]; audience: string; content_pillars: string[];
@@ -24,7 +25,8 @@ type Brand = {
   publishing_rules: string[]; forbidden_terms: string[]; version_no: number; updated_at: string | null;
   history: { version: number; at: string; by: string; note: string; data: Record<string, unknown> }[];
 };
-type Channel = { id: string; code: string; name: string; description: string; platforms: string[]; is_active: boolean; project_count: number; brand: Brand | null };
+type Channel = { id: string; code: string; name: string; description: string; platforms: string[]; is_active: boolean; project_count: number; brand: Brand | null;
+  publish_targets?: { FACEBOOK?: FbTarget } };
 
 const TEXT_FIELDS: [keyof Brand, string][] = [["slogan", "Slogan"], ["brand_promise", "Brand Promise"], ["big_idea", "Big Idea"]];
 const LIST_FIELDS: [keyof Brand, string, string][] = [
@@ -141,7 +143,7 @@ export default function ChannelsPage() {
                     className={cn("w-full rounded-xl border bg-white p-3 text-left shadow-sm transition", c.id === ch?.id ? "border-brand-500 ring-2 ring-brand-100" : "border-slate-200 hover:border-brand-300")}>
                     <div className="flex items-center justify-between"><p className="font-semibold">{c.name}</p>{!c.is_active && <Badge variant="gray">Ngừng</Badge>}</div>
                     <p className="text-xs text-slate-500">{c.code} · {c.project_count} dự án · DNA v{c.brand?.version_no ?? 1}</p>
-                    <div className="mt-1 flex flex-wrap gap-1">{c.platforms.map((p) => <Badge key={p} variant="gray">{p}</Badge>)}</div>
+                    <div className="mt-1 flex flex-wrap gap-1">{c.platforms.map((p) => <Badge key={p} variant={p === "FACEBOOK" && c.publish_targets?.FACEBOOK ? "green" : "gray"}>{p}</Badge>)}</div>
                   </button>
                 ))}
               </div>
@@ -181,6 +183,7 @@ export default function ChannelsPage() {
                         ))}
                       </div>
                     )}
+                    <FacebookConnect channelId={ch.id} target={ch.publish_targets?.FACEBOOK} canEdit={has("channel.edit")} />
                     <p className="text-xs text-slate-500">Brand DNA phiên bản v{ch.brand?.version_no ?? 1}{ch.brand?.updated_at ? ` · cập nhật ${formatDate(ch.brand.updated_at)}` : ""}</p>
                     <BrandEditor ch={ch} canEdit={has("channel.edit")} />
                   </CardContent>

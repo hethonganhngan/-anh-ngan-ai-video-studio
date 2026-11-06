@@ -1,4 +1,5 @@
 """B09 — AI Lessons Learned Engine. Bài học chỉ đi vào cấu hình chuẩn sau khi được duyệt; có rollback."""
+import re
 from datetime import datetime, timezone
 
 from app.agents.runner import run_agent
@@ -17,6 +18,17 @@ LESSON_TYPES = {"RESOLVED_ERROR", "FAILED_PROMPT", "EFFECTIVE_PROMPT", "GOOD_VOI
 EDITABLE = {"DRAFT", "PENDING_APPROVAL", "REJECTED"}
 FIELDS = ["lesson_type", "title", "lesson", "root_cause", "capa_summary", "verification_summary", "channel_id",
           "character_id", "error_category", "provider_code", "prompt_example", "proposed_change", "tags"]
+
+
+LESSON_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["title", "lesson"],
+    "properties": {"title": {"type": "string"}, "lesson": {"type": "string"}},
+}
+LESSON_SYSTEM = ("Bạn là A09 — biên tập viên bài học kinh nghiệm cho xưởng video AI của Hệ thống Sữa Ánh Ngân. "
+                 "Từ một hồ sơ lỗi đã được kiểm chứng, viết bài học tiếng Việt: title ≤ 120 ký tự; lesson 2–4 câu theo dạng "
+                 "'Khi … thì … vì … → làm …', nêu rõ dấu hiệu nhận biết, nguyên nhân gốc, hành động đã chứng minh hiệu quả và "
+                 "số liệu trước/sau nếu có. Chỉ dùng thông tin trong hồ sơ, không bịa số liệu.")
+PROMPT_LESSON_LIMIT = 5
 
 
 def _now():
@@ -71,18 +83,25 @@ def draft_from_case(ctx: Ctx, case: FeedbackCase, overrides: dict) -> LessonLear
     capa_text = "; ".join(f"[{a.action_type}] {a.description}" for a in capas)
     kpi = f"KPI {case.kpi_name}: {case.kpi_before} → {vr.kpi_after}" if case.kpi_name else ""
 
+    fallback = {"title": f"Bài học: {case.title[:200]}",
+                "lesson": f"Khi gặp '{case.title}', nguyên nhân gốc là: {rca.root_cause if rca else 'chưa xác định'}. "
+                          f"Áp dụng: {capa_text}. {kpi}".strip()}
+    prompt = (f"Hồ sơ {case.code} — loại lỗi {case.category}, nguồn {case.source}\nTiêu đề: {case.title}\n"
+              f"Mô tả: {case.description}\nNguyên nhân gốc: {rca.root_cause if rca else 'chưa xác định'}\n"
+              f"CAPA đã làm: {capa_text or '—'}\nKiểm chứng: {vr.method}. {kpi}\nChuẩn hoá: {case.standardization_note}")
+
     def work(llm, _actx):
-        res = llm.complete_json(system="A09 Lesson", prompt=f"{case.code} {case.title}", schema={"type": "object"},
-                                mock_fn=lambda: {"title": f"Bài học: {case.title[:200]}",
-                                                 "lesson": f"Khi gặp '{case.title}', nguyên nhân gốc là: "
-                                                           f"{rca.root_cause if rca else 'chưa xác định'}. "
-                                                           f"Áp dụng: {capa_text}. {kpi}".strip()})
+        res = llm.complete_json(system=LESSON_SYSTEM, prompt=prompt, schema=LESSON_SCHEMA, max_tokens=2000,
+                                mock_fn=lambda: fallback)
         return res.data, res
 
     run = run_agent(ctx, "A09", "lesson.draft", work, needs_llm=True, input_ref={"case": case.code})
+    out = run.output if isinstance(run.output, dict) else {}
+    title = str(out.get("title") or "").strip() or fallback["title"]
+    body = str(out.get("lesson") or "").strip() or fallback["lesson"]
     lesson_type = overrides.get("lesson_type") or ("FAILED_PROMPT" if case.category == "PROMPT" else "RESOLVED_ERROR")
-    data = {"lesson_type": lesson_type, "title": overrides.get("title") or run.output["title"],
-            "lesson": overrides.get("lesson") or run.output["lesson"], "root_cause": rca.root_cause if rca else "",
+    data = {"lesson_type": lesson_type, "title": (overrides.get("title") or title)[:255],
+            "lesson": overrides.get("lesson") or body, "root_cause": rca.root_cause if rca else "",
             "capa_summary": capa_text, "verification_summary": f"{vr.method}. {kpi}".strip(),
             "channel_id": case.channel_id, "character_id": case.character_id, "error_category": case.category,
             "provider_code": case.provider_code, "proposed_change": overrides.get("proposed_change") or {},
@@ -129,6 +148,8 @@ def review_lesson(ctx: Ctx, lid, approve: bool, comment: str = "") -> LessonLear
             raise ValidationFailed("Hồ sơ phản hồi gốc chưa được kiểm chứng", code="VERIFICATION_REQUIRED")
     if not approve and not comment.strip():
         raise ValidationFailed("Cần lý do từ chối")
+    if approve and x.created_by and str(x.created_by) == ctx.actor.id and ctx.actor.role_code != "SUPER_ADMIN":
+        raise ValidationFailed("Người soạn bài học không tự phê duyệt (nguyên tắc 4 mắt)", code="SELF_APPROVAL")
     x.status = "APPROVED" if approve else "REJECTED"
     if approve:
         x.approved_by = ctx.actor.user_uuid
@@ -193,7 +214,7 @@ def search(ctx: Ctx, *, q=None, channel_id=None, character_id=None, error_catego
            lesson_type=None, status=None, page=1, page_size=50):
     stmt = select(LessonLearned).where(LessonLearned.data_mode == ctx.mode)
     if q:
-        like = f"%{q}%"
+        like = "%" + re.sub(r"([%_\\])", r"\\\1", q.strip()) + "%"
         stmt = stmt.where(or_(LessonLearned.title.ilike(like), LessonLearned.lesson.ilike(like),
                               LessonLearned.root_cause.ilike(like), cast(LessonLearned.tags, String).ilike(like),
                               LessonLearned.code.ilike(like)))
@@ -215,3 +236,25 @@ def relevant_for_project(ctx: Ctx, project) -> list[LessonLearned]:
                                        or_(LessonLearned.channel_id == project.channel_id, LessonLearned.channel_id.is_(None),
                                            LessonLearned.provider_code == project.video_provider_code))
     return ctx.db.scalars(stmt.order_by(LessonLearned.created_at.desc()).limit(10)).all()
+
+
+def prompt_lessons(ctx: Ctx, project) -> list[LessonLearned]:
+    """A09 lesson.search cho A02: bài học ĐÃ DUYỆT nhưng chưa nằm trong template (APPLIED đã ở prompt chuẩn),
+    cùng kênh hoặc dùng chung, ưu tiên đúng nhân vật/nhà cung cấp và bài học mới duyệt."""
+    chars = [str(c) for c in (project.character_ids or [])]
+    stmt = select(LessonLearned).where(
+        LessonLearned.data_mode == ctx.mode, LessonLearned.status == "APPROVED",
+        or_(LessonLearned.channel_id == project.channel_id, LessonLearned.channel_id.is_(None)))
+    rows = ctx.db.scalars(stmt.order_by(LessonLearned.approved_at.desc().nulls_last()).limit(50)).all()
+
+    def score(x):
+        return ((x.character_id is not None and str(x.character_id) in chars) * 4
+                + (x.provider_code is not None and x.provider_code == project.video_provider_code) * 2
+                + (x.channel_id is not None) * 1)
+
+    rows = [x for x in rows if x.character_id is None or str(x.character_id) in chars]
+    return sorted(rows, key=score, reverse=True)[:PROMPT_LESSON_LIMIT]
+
+
+def lesson_rules(lessons: list[LessonLearned]) -> list[str]:
+    return [f"Bài học {x.code}: {' '.join(x.lesson.split())[:300]}" for x in lessons]

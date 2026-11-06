@@ -75,6 +75,25 @@ CHANNELS = [
 BASE_NEGATIVE = ("chữ méo hoặc sai chính tả, logo sai, watermark, biến dạng tay/ngón tay, khuôn mặt thay đổi giữa các cảnh, "
                  "trang phục thay đổi so với Character Lock, mờ nhoè, nhấp nháy, nội dung bạo lực, sản phẩm thương hiệu "
                  "đối thủ, bao bì sữa công thức cho trẻ dưới 24 tháng, trẻ em trong tình huống nguy hiểm")
+# Chống "lộ AI" (CEO, 30/10/2026): da thật, ánh sáng điện thoại đời thường, chữ trên lon sữa không cần đọc được
+REALISM_NEGATIVE = ("da mịn như nhựa/da búp bê, ánh sáng studio quá hoàn hảo, tên thương hiệu đọc được trên lon sữa "
+                    "(readable brand names), chữ trên bao bì")
+
+# Quy tắc A02 — thoại kiểu nói chuyện thật, đúng vai tư vấn viên, đúng sản phẩm được phép
+SCRIPT_RULES = [
+    "Thoại viết như nói thật, giọng miền Nam: câu ngắn, có từ đệm 'nè', 'á', 'nha', có chỗ ngập ngừng '…'. "
+    "Ví dụ: 'Hồi bé nhà chị cũng biếng ăn dữ lắm á… mấy mẹ đừng lo quá nha.'",
+    "Nhân vật là tư vấn viên / đại diện thương hiệu Ánh Ngân đang tư vấn — KHÔNG đóng vai khách hàng mua thật đang review.",
+    "Sản phẩm chỉ là sữa cho trẻ trên 24 tháng, sữa pha sẵn hoặc đồ dùng; hoặc nội dung kiến thức nuôi con không gắn sản phẩm.",
+]
+# Quy tắc A03 — lặp nguyên khối nhận diện nhân vật mỗi cảnh + 3 yếu tố "không lộ AI"
+SCENE_RULES = [
+    "Giữ nguyên khối nhận diện nhân vật (khuôn mặt, tóc, kính, trang phục) giống hệt ở mọi cảnh.",
+    "Chân thực như quay bằng điện thoại: da có khuyết điểm thật (lỗ chân lông, nếp nhăn nhẹ), ánh sáng đời thường "
+    "trong cửa hàng, máy cầm tay hơi rung nhẹ.",
+    "Nhân vật là tư vấn viên / đại diện thương hiệu đang tư vấn, không phải khách hàng đang review.",
+    "Chữ và logo trên bao bì không cần đọc được — logo thật được chèn ở bước dựng.",
+]
 
 PROMPT_TEMPLATES = [
     {
@@ -93,7 +112,7 @@ PROMPT_TEMPLATES = [
             "- Tiếng Việt có dấu đầy đủ, tự nhiên, gần gũi.\n"
             "{% for r in rules %}- {{ r }}\n{% endfor %}"
         ),
-        "negative_prompt": "",
+        "negative_prompt": "", "rules": SCRIPT_RULES,
     },
     {
         "code": "A03.scene_prompt", "name": "Prompt cảnh 9 phần", "agent_code": "A03",
@@ -111,7 +130,7 @@ PROMPT_TEMPLATES = [
             "Định dạng: video dọc {{ aspect_ratio }}, {{ duration }} giây, 1080x1920, chuyển động tự nhiên."
             "{% for r in rules %}\nLưu ý: {{ r }}{% endfor %}"
         ),
-        "negative_prompt": BASE_NEGATIVE,
+        "negative_prompt": BASE_NEGATIVE + ", " + REALISM_NEGATIVE, "rules": SCENE_RULES,
     },
     {
         "code": "A08.rca", "name": "Phân tích nguyên nhân gốc (5 Whys)", "agent_code": "A08",
@@ -137,6 +156,24 @@ VEO_VERTEX_CONFIG = {
             "logo/phụ đề ghép ở M06. Giá Veo 3.1 Fast ~0,10–0,15 USD/giây (tham khảo, kiểm tra bảng giá Google).",
 }
 
+FLOW_CDP_CONFIG = {
+    "adapter": "flow_cdp", "cdp_url": "http://127.0.0.1:9222",
+    "project_url": "https://flow.google.com/project/6ae396ef-7905-495b-90b1-564042d940cd",
+    "timeout_min": 15, "model": "Omni 1.1 Flash", "speech_in_video": True,
+    "provider_voice": True, "voiceover_scene_volume": 1.0,  # giữ nguyên giọng Flow tạo (CEO chốt 31/10/2026), không lồng TTS
+    "ingredients": ["MeAnhNgan", "Cửa hàng Ánh Ngân"], "max_duration_sec": 8, "supported_aspects": ["9:16", "16:9"],
+    "note": "THỬ NGHIỆM (D21): Playwright điều khiển Chrome đã đăng nhập Flow qua CDP, dùng lượt của gói Google — "
+            "không tốn phí API. Chạy scripts/windows/start-flow-chrome.ps1, đăng nhập Flow 1 lần trong cửa sổ đó, "
+            "bấm 'Kiểm tra'. Rủi ro: Google có thể hạn chế tài khoản vì truy cập tự động.",
+}
+
+VIENEU_CONFIG = {
+    "adapter": "vieneu_local", "base_url": "http://127.0.0.1:8200", "speed": 1.0,
+    "note": "Nhân bản giọng từ bản ghi âm chính chủ của Voice Profile (M04), chạy trên máy — không phí (D23). "
+            "Chạy scripts/windows/start-vieneu.ps1, bấm 'Kiểm tra' rồi bật. Voice Profile: nhà cung cấp vieneu_local, "
+            "tên giọng = mã Voice Profile.",
+}
+
 PROVIDERS = [
     {"provider_type": "VIDEO", "provider_code": "mock", "name": "Mock Video Provider (DEMO)", "is_enabled": True,
      "connection_status": "BUILTIN", "unit_cost": 1500, "cost_unit": "SECOND",
@@ -147,6 +184,9 @@ PROVIDERS = [
     {"provider_type": "VIDEO", "provider_code": "veo_vertex", "name": "Google Veo (Vertex AI) — API chính thức",
      "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 3900, "cost_unit": "SECOND",
      "config": VEO_VERTEX_CONFIG},
+    {"provider_type": "VIDEO", "provider_code": "flow_cdp", "name": "Google Flow tự động (Chrome CDP, thử nghiệm)",
+     "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "SECOND",
+     "config": FLOW_CDP_CONFIG},
     {"provider_type": "VIDEO", "provider_code": "gemini_omni", "name": "Google Gemini Omni Flash — tạo video AI",
      "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 2600, "cost_unit": "SECOND",
      "config": {"adapter": "gemini_omni", "model": "gemini-omni-1.1-flash", "resolution": "720p", "background": True,
@@ -164,6 +204,9 @@ PROVIDERS = [
     {"provider_type": "LLM", "provider_code": "anthropic", "name": "Anthropic Claude", "is_enabled": False,
      "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "TOKEN",
      "config": {"model": "claude-opus-5-5"}},
+    {"provider_type": "TTS", "provider_code": "vieneu_local", "name": "VieNeu-TTS — giọng nhân bản chạy trên máy",
+     "is_enabled": False, "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "SECOND",
+     "config": VIENEU_CONFIG},
     {"provider_type": "TTS", "provider_code": "tts_none", "name": "Text-to-Speech (chưa kết nối)", "is_enabled": False,
      "connection_status": "NOT_CONFIGURED", "unit_cost": 0, "cost_unit": "CHAR",
      "config": {"note": "Voice-over hiện tải lên thủ công (file thu âm có consent)."}},

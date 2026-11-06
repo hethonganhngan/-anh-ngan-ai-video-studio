@@ -12,10 +12,13 @@ def _registry() -> dict:
         "anngan.generation.poll_job": jobs.poll_generation_job,
         "anngan.render.run_job": jobs.run_render_job,
         "anngan.workflow.recover_stuck": jobs.recover_stuck_jobs,
+        "anngan.publishing.auto_prepare": jobs.auto_prepare_publishing,
+        "anngan.publishing.sync_facebook": jobs.sync_facebook_drafts,
     }
 
 
-TASK_NAMES = ["anngan.generation.run_job", "anngan.generation.poll_job", "anngan.render.run_job", "anngan.workflow.recover_stuck"]
+TASK_NAMES = ["anngan.generation.run_job", "anngan.generation.poll_job", "anngan.render.run_job", "anngan.workflow.recover_stuck",
+              "anngan.publishing.auto_prepare", "anngan.publishing.sync_facebook"]
 
 
 def run_inline(name: str, *args):

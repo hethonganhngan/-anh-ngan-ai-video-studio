@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { BarChart3, Download, ExternalLink, Send, XCircle, CheckCircle2 } from "lucide-react";
+import { BarChart3, Download, ExternalLink, Send, XCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api, assetUrl, errorMessage } from "@/lib/api";
 import { useAction } from "@/hooks/use-mutate";
@@ -61,7 +61,24 @@ export function PubRowActions({ pub, onChange }: { pub: Publication; onChange: (
     catch (e) { toast.error(errorMessage(e), { id: "publish-api-error" }); }
     finally { setBusy(null); }
   };
+  const fbDraft = async () => {
+    setBusy("fb");
+    try { await api(`/publications/${pub.id}/facebook-draft`, { method: "POST" }); toast.success("Đã gửi bản nháp lên Facebook — duyệt đăng trong Meta Business Suite"); onChange(); }
+    catch (e) { toast.error(errorMessage(e), { id: "fb-draft-error" }); }
+    finally { setBusy(null); }
+  };
+  const fbSync = async () => {
+    setBusy("sync");
+    try {
+      const r = await api<Publication>(`/publications/${pub.id}/facebook-sync`, { method: "POST" });
+      toast.success(r.status === "PUBLISHED" ? "Bài đã được đăng trên Facebook" : "Facebook: bản nháp vẫn đang chờ duyệt");
+      onChange();
+    } catch (e) { toast.error(errorMessage(e), { id: "fb-sync-error" }); }
+    finally { setBusy(null); }
+  };
   const done = pub.status === "PUBLISHED";
+  const review = pub.status === "PENDING_REVIEW";
+  const isFb = pub.platform === "FACEBOOK";
   return (
     <div className="flex flex-wrap justify-end gap-1">
       {pub.export_asset_id && <Button size="sm" variant="ghost" asChild><a href={assetUrl(pub.export_asset_id, true)} data-testid="pub-download"><Download />ZIP</a></Button>}
@@ -69,8 +86,13 @@ export function PubRowActions({ pub, onChange }: { pub: Publication; onChange: (
         <Can perm="publish.manage"><Button size="sm" variant="ghost" onClick={() => exportPkg.mutate(undefined)} loading={exportPkg.isPending} data-testid="pub-export"><Download />Xuất file</Button></Can>
         <Can perm="publish.execute">
           <Button size="sm" variant="ghost" onClick={() => setMark(true)} data-testid="pub-mark"><CheckCircle2 />Đã đăng</Button>
-          <Button size="sm" variant="ghost" onClick={viaApi} loading={busy === "api"} data-testid="pub-api"><Send />Đăng qua API</Button>
+          {!isFb && <Button size="sm" variant="ghost" onClick={viaApi} loading={busy === "api"} data-testid="pub-api"><Send />Đăng qua API</Button>}
         </Can>
+        {isFb && !review && <Can perm="publish.manage"><Button size="sm" variant="ghost" onClick={fbDraft} loading={busy === "fb"} data-testid="pub-fb-draft"><Send />Gửi nháp Facebook</Button></Can>}
+        {review && <Can perm="publish.manage">
+          <Button size="sm" variant="ghost" asChild><a href="https://business.facebook.com/latest/posts/drafts" target="_blank" rel="noreferrer noopener" data-testid="pub-fb-review"><ExternalLink />Duyệt trên Meta</a></Button>
+          <Button size="sm" variant="ghost" onClick={fbSync} loading={busy === "sync"} data-testid="pub-fb-sync"><RefreshCw />Kiểm tra</Button>
+        </Can>}
         <Can perm="publish.manage"><Button size="sm" variant="ghost" onClick={() => cancel.mutate(undefined)} data-testid="pub-cancel"><XCircle />Huỷ</Button></Can>
       </>)}
       {done && pub.post_url && <Button size="sm" variant="ghost" asChild><a href={pub.post_url} target="_blank" rel="noreferrer noopener"><ExternalLink />Xem</a></Button>}

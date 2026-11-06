@@ -43,7 +43,16 @@ def build_real_provider(acc: ProviderAccount, key: str | None) -> VideoProvider:
 
         return VeoVertexProvider(code=acc.provider_code, name=acc.name, api_key=key, config=acc.config,
                                  unit_cost_vnd_per_sec=acc.unit_cost)
+    if (acc.config or {}).get("adapter") == "flow_cdp":
+        from app.providers.video.flow_cdp import FlowCDPProvider
+
+        return FlowCDPProvider(code=acc.provider_code, name=acc.name, config=acc.config)
     return RealAPIProvider(code=acc.provider_code, name=acc.name, api_key=key, config=acc.config)
+
+
+def no_key(acc: ProviderAccount) -> bool:
+    """Flow qua CDP dùng phiên Chrome đã đăng nhập, không cần API key."""
+    return (acc.config or {}).get("adapter") == "flow_cdp"
 
 
 def list_video_providers(db: Session, mode: str) -> list[dict]:
@@ -57,7 +66,7 @@ def list_video_providers(db: Session, mode: str) -> list[dict]:
         if acc.provider_code in BUILTIN:
             continue
         out.append({"code": acc.provider_code, "name": acc.name, "kind": "REAL_API", "is_real": True,
-                    "available": mode == "PRODUCTION" and acc.is_enabled and bool(acc.secret_encrypted),
+                    "available": mode == "PRODUCTION" and acc.is_enabled and (bool(acc.secret_encrypted) or no_key(acc)),
                     "connection_status": acc.connection_status, "unit_cost_vnd_per_sec": float(acc.unit_cost),
                     "max_duration_sec": acc.config.get("max_duration_sec", 8),
                     "supported_aspects": acc.config.get("supported_aspects", ["9:16"])})

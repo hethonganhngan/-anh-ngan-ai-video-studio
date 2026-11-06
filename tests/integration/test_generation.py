@@ -159,7 +159,7 @@ def test_manual_flow_import(login, channels):
     assert r.status_code == 422 and r.json()["error"]["code"] == "INVALID_FLOW_CLIP"
     # File giả mạo (text đổi đuôi .mp4)
     fake = bad.with_name("fake.mp4")
-    fake.write_text("không phải video")
+    fake.write_text("không phải video", encoding="utf-8")
     with open(fake, "rb") as f:
         r = editor.post(f"/scenes/{scenes[0]['id']}/import-flow", files={"file": ("fake.mp4", f)})
     assert r.status_code == 422

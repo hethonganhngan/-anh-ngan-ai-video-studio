@@ -4,6 +4,7 @@
 Trạng thái: NEW → VALIDATED → RCA_PENDING → ACTION_APPROVED → IN_PROGRESS → VERIFY_PENDING → VERIFIED
             → STANDARDIZED → CLOSED; VERIFY_PENDING → REOPENED khi kiểm chứng không đạt.
 Nguyên tắc: không đóng khi thiếu bằng chứng; không tuyên bố đã sửa khi chưa có kết quả kiểm chứng."""
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -32,6 +33,46 @@ CATEGORIES = {"PROMPT", "CHARACTER", "VOICE", "PROVIDER", "SCRIPT", "AUDIO", "VI
               "ASSET", "PERFORMANCE", "OTHER"}
 EVIDENCE_CLASSES = {"FACT", "HYPOTHESIS", "UNKNOWN"}
 PRIORITY_DAYS = {"P0": 1, "P1": 3, "P2": 7, "P3": 14}
+CLOSED_OK = ("VERIFIED", "STANDARDIZED", "CLOSED")
+RCA_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["whys", "root_cause", "confidence_pct"],
+    "properties": {
+        "whys": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["question", "answer"],
+                                            "properties": {"question": {"type": "string"}, "answer": {"type": "string"}}}},
+        "root_cause": {"type": "string"}, "confidence_pct": {"type": "integer"},
+    },
+}
+RCA_SYSTEM = ("Bạn là A08 — chuyên viên phân tích nguyên nhân gốc (5 Whys) cho xưởng video AI của Hệ thống Sữa Ánh Ngân. "
+              "Trả lời tiếng Việt, ngắn gọn, cụ thể theo quy trình sản xuất video (kịch bản → prompt → nhân vật/giọng → "
+              "tạo cảnh → dựng → QC → đăng). Đúng 5 câu hỏi 'Tại sao?' nối tiếp nhau, câu sau đào sâu câu trước; "
+              "nguyên nhân gốc phải là điểm hệ thống/quy trình sửa được, không đổ lỗi cá nhân. Nếu có hồ sơ tương tự đã "
+              "kiểm chứng, ưu tiên học từ chúng nhưng chỉ dùng khi thật sự khớp. Đây chỉ là GIẢ THUYẾT, "
+              "confidence_pct từ 0 đến 100 (thường ≤ 60 khi thiếu bằng chứng).")
+RCA_TEMPLATES = {
+    "CHARACTER": ["Nhân vật khác nhau giữa các cảnh", "Prompt mỗi cảnh mô tả nhân vật không giống nhau",
+                  "Character Lock chưa được đưa đủ vào prompt", "Template prompt thiếu khối mô tả cố định",
+                  "Chưa có quy tắc bắt buộc tham chiếu Character Lock"],
+    "AUDIO": ["Âm lượng video không đạt chuẩn", "Các clip có mức âm khác nhau", "Không chuẩn hoá loudness khi dựng",
+              "Thiếu bước kiểm tra LUFS trước phát hành", "Chưa có tiêu chuẩn âm thanh trong SOP"],
+    "COMPLIANCE": ["Nội dung có từ/tuyên bố bị cấm", "Kịch bản không qua bộ lọc tuân thủ trước khi duyệt",
+                   "Danh sách từ cấm chưa đầy đủ", "Brand DNA chưa cập nhật quy định", "Thiếu bước duyệt tuân thủ"],
+    "PROMPT": ["Cảnh tạo ra không đúng mô tả", "Prompt cảnh mơ hồ hoặc mâu thuẫn", "Template A03 thiếu chỉ dẫn cụ thể",
+               "Negative prompt chưa chặn lỗi đã biết", "Chưa có bước đối chiếu prompt với kết quả trước khi duyệt"],
+    "VOICE": ["Giọng nói không đúng nhân vật", "Voice Lock không được dùng khi lồng tiếng", "Dự án chưa gán giọng cho nhân vật",
+              "Bước kiểm tra tài nguyên không chặn khi thiếu giọng", "Chưa có quy tắc bắt buộc Voice Lock"],
+    "PROVIDER": ["Cảnh lỗi do nhà cung cấp video", "Nhà cung cấp trả kết quả không ổn định", "Cấu hình model/thiết lập chưa phù hợp",
+                 "Thiếu kiểm tra kỹ thuật tự động sau khi tạo cảnh", "Chưa có phương án dự phòng nhà cung cấp"],
+    "SCRIPT": ["Kịch bản không hấp dẫn hoặc sai thông điệp", "Hook 3 giây yếu", "Brief đầu vào thiếu insight khách hàng",
+               "Template A02 chưa có quy tắc tương ứng", "Chưa có bài học kịch bản hiệu quả được áp dụng"],
+    "VISUAL": ["Hình ảnh lỗi (méo, chữ sai, chi tiết lạ)", "Model tạo chi tiết ngoài ý muốn", "Negative prompt chưa đủ",
+               "QC cảnh chưa có tiêu chí hình ảnh tương ứng", "Chưa chuẩn hoá danh sách lỗi hình ảnh cần chặn"],
+    "BRAND": ["Video lệch nhận diện thương hiệu", "Prompt/dựng không dùng Brand DNA", "Logo/màu chủ đạo chưa cố định trong Scene Lock",
+              "Checklist QC thương hiệu chưa đầy đủ", "Brand DNA chưa được cập nhật vào template"],
+    "PERFORMANCE": ["Video có hiệu quả thấp sau khi đăng", "Hook/nội dung không giữ chân người xem", "Chủ đề chưa đúng nhu cầu khán giả",
+                    "Chưa phân tích số liệu video tốt/kém trước khi lên ý tưởng", "Chưa có bài học hiệu quả đưa vào kịch bản"],
+}
+DEFAULT_WHYS = ["Lỗi xảy ra trong sản phẩm", "Bước sản xuất liên quan không phát hiện lỗi", "Thiếu kiểm tra ở bước đó",
+                "Tiêu chuẩn chưa quy định rõ", "Quy trình chưa được chuẩn hoá"]
 CRITERION_TO_CATEGORY = {"hook": "SCRIPT", "script": "SCRIPT", "character": "CHARACTER", "setting": "PROMPT",
                          "visual": "VISUAL", "voice": "VOICE", "lipsync": "PROVIDER", "audio": "AUDIO", "brand": "BRAND",
                          "compliance": "COMPLIANCE"}
@@ -74,6 +115,11 @@ def _validate_evidence(items: list[dict]) -> list[dict]:
         out.append({"type": e.get("type", "NOTE"), "ref": str(e.get("ref", ""))[:500], "note": str(e.get("note", ""))[:1000],
                     "added_at": _now().isoformat()})
     return out
+
+
+def _like(q: str) -> str:
+    """Chuỗi tìm kiếm ILIKE an toàn: ký tự %, _ và dấu gạch chéo người dùng gõ được hiểu theo nghĩa đen."""
+    return "%" + re.sub(r"([%_\\])", r"\\\1", q.strip()) + "%"
 
 
 def create_case(ctx: Ctx, data: dict, *, actor_check: bool = True) -> FeedbackCase:
@@ -141,7 +187,7 @@ def create_from_finding(ctx: Ctx, finding, auto: bool = False) -> FeedbackCase:
     c = create_case(ctx, {
         "source": "QC", "category": sug["category"], "title": f"[{finding.severity}] {finding.description}"[:255],
         "description": f"Phát hiện bởi QC ({finding.criterion}). {finding.description}", "project_id": finding.project_id,
-        "scene_id": finding.scene_id, "qc_finding_id": finding.id, "evidence_class": "FACT",
+        "scene_id": finding.scene_id, "qc_finding_id": finding.id, "evidence_class": "FACT", "priority": sug["priority"],
         "evidence": [{"type": "QC_FINDING", "ref": str(finding.id), "note": finding.description}],
     }, actor_check=False)
     c.description += f"\nGợi ý ưu tiên của A08: {sug['priority']} ({sug['reason']})"
@@ -186,26 +232,60 @@ def suggest_rca(ctx: Ctx, case_id) -> dict:
     """A08: gợi ý 5 Whys — LUÔN là HYPOTHESIS, cần người xác nhận bằng bằng chứng."""
     ctx.require("feedback.manage")
     c = get_case(ctx, case_id)
-    templates = {
-        "CHARACTER": ["Nhân vật khác nhau giữa các cảnh", "Prompt mỗi cảnh mô tả nhân vật không giống nhau",
-                      "Character Lock chưa được đưa đủ vào prompt", "Template prompt thiếu khối mô tả cố định",
-                      "Chưa có quy tắc bắt buộc tham chiếu Character Lock"],
-        "AUDIO": ["Âm lượng video không đạt chuẩn", "Các clip có mức âm khác nhau", "Không chuẩn hoá loudness khi dựng",
-                  "Thiếu bước kiểm tra LUFS trước phát hành", "Chưa có tiêu chuẩn âm thanh trong SOP"],
-        "COMPLIANCE": ["Nội dung có từ/tuyên bố bị cấm", "Kịch bản không qua bộ lọc tuân thủ trước khi duyệt",
-                       "Danh sách từ cấm chưa đầy đủ", "Brand DNA chưa cập nhật quy định", "Thiếu bước duyệt tuân thủ"],
-    }
-    whys = templates.get(c.category) or ["Lỗi xảy ra trong sản phẩm", "Bước sản xuất liên quan không phát hiện lỗi",
-                                         "Thiếu kiểm tra ở bước đó", "Tiêu chuẩn chưa quy định rõ", "Quy trình chưa được chuẩn hoá"]
+    whys = RCA_TEMPLATES.get(c.category) or DEFAULT_WHYS
+    similar = similar_cases(ctx, c)
+    history = "\n".join(f"- {x['code']} «{x['title']}»: nguyên nhân gốc «{x['root_cause']}»; CAPA hiệu quả: "
+                        f"{'; '.join(x['capa']) or '—'}" for x in similar) or "Chưa có"
+    evidence = "; ".join(e.get("note") or e.get("ref") or "" for e in (c.evidence or [])[:5]) or "Chưa có"
+    prompt = (f"Hồ sơ {c.code} — loại lỗi {c.category}, nguồn {c.source}\nTiêu đề: {c.title}\nMô tả: {c.description}\n"
+              f"Bằng chứng: {evidence}\n\nHồ sơ tương tự đã kiểm chứng đạt:\n{history}")
+
+    def mock():
+        root = similar[0]["root_cause"] if similar else whys[-1]
+        return {"whys": [{"question": f"Tại sao {i + 1}?", "answer": w} for i, w in enumerate(whys)],
+                "root_cause": root, "confidence_pct": 50 if similar else 40}
 
     def work(llm, _actx):
-        res = llm.complete_json(system="A08 RCA", prompt=f"{c.title}\n{c.description}", schema={"type": "object"},
-                                mock_fn=lambda: {"whys": [{"question": f"Tại sao {i + 1}?", "answer": w} for i, w in enumerate(whys)],
-                                                 "root_cause": whys[-1], "evidence_class": "HYPOTHESIS", "confidence_pct": 40})
+        res = llm.complete_json(system=RCA_SYSTEM, prompt=prompt, schema=RCA_SCHEMA, max_tokens=4000, mock_fn=mock)
         return res.data, res
 
-    run = run_agent(ctx, "A08", "feedback.rca_suggest", work, needs_llm=True, input_ref={"case": c.code})
-    return {**run.output, "evidence_class": "HYPOTHESIS", "note": "Gợi ý của A08 — chưa phải kết luận"}
+    run = run_agent(ctx, "A08", "feedback.rca_suggest", work, needs_llm=True,
+                    input_ref={"case": c.code, "similar": [x["code"] for x in similar]})
+    out = _normalize_rca(run.output, whys)
+    return {**out, "similar_cases": similar, "evidence_class": "HYPOTHESIS", "note": "Gợi ý của A08 — chưa phải kết luận"}
+
+
+def _normalize_rca(data, fallback: list[str]) -> dict:
+    """Kết quả LLM có thể thiếu/sai kiểu → luôn trả đủ 5 Whys dạng {question, answer} và mức chắc chắn hợp lệ."""
+    data = data if isinstance(data, dict) else {}
+    whys = [w for w in (data.get("whys") or []) if isinstance(w, dict) and str(w.get("answer") or "").strip()][:5]
+    whys = [{"question": str(w.get("question") or f"Tại sao {i + 1}?")[:300], "answer": str(w["answer"])[:500]}
+            for i, w in enumerate(whys)]
+    if len(whys) < 3:
+        whys = [{"question": f"Tại sao {i + 1}?", "answer": a} for i, a in enumerate(fallback)]
+    try:
+        conf = max(0, min(100, int(data.get("confidence_pct", 40))))
+    except (TypeError, ValueError):
+        conf = 40
+    root = str(data.get("root_cause") or "").strip() or whys[-1]["answer"]
+    return {"whys": whys, "root_cause": root[:1000], "confidence_pct": conf}
+
+
+def similar_cases(ctx: Ctx, c: FeedbackCase, limit: int = 3) -> list[dict]:
+    """A08 học từ lịch sử: hồ sơ cùng loại lỗi đã kiểm chứng đạt → nguyên nhân gốc và CAPA đã chứng minh hiệu quả."""
+    rows = ctx.db.execute(
+        select(FeedbackCase, RootCauseAnalysis)
+        .join(RootCauseAnalysis, RootCauseAnalysis.feedback_case_id == FeedbackCase.id)
+        .where(FeedbackCase.data_mode == ctx.mode, FeedbackCase.id != c.id, FeedbackCase.category == c.category,
+               FeedbackCase.status.in_(CLOSED_OK), RootCauseAnalysis.is_current)
+        .order_by(FeedbackCase.updated_at.desc()).limit(limit)).all()
+    out = []
+    for case, rca in rows:
+        capas = ctx.db.scalars(select(CAPAAction.description).where(CAPAAction.feedback_case_id == case.id,
+                                                                    CAPAAction.status == "DONE")).all()
+        out.append({"id": str(case.id), "code": case.code, "title": case.title, "root_cause": rca.root_cause,
+                    "cause_category": rca.cause_category, "capa": list(capas)[:5]})
+    return out
 
 
 def record_rca(ctx: Ctx, case_id, *, whys: list[dict], root_cause: str, cause_category: str, evidence_class: str,
@@ -242,7 +322,9 @@ def record_rca(ctx: Ctx, case_id, *, whys: list[dict], root_cause: str, cause_ca
 def add_capa(ctx: Ctx, case_id, *, action_type: str, description: str, owner_id=None, deadline=None) -> CAPAAction:
     ctx.require("feedback.manage")
     c = _lock(ctx, case_id)
-    if c.status not in ("RCA_PENDING", "REOPENED", "IN_PROGRESS"):
+    if c.status == "REOPENED":
+        raise InvalidTransition("Hồ sơ đang mở lại — chọn 'Xử lý lại' (phân tích lại hoặc tiếp tục CAPA) trước khi thêm CAPA")
+    if c.status not in ("RCA_PENDING", "IN_PROGRESS"):
         raise InvalidTransition("Chỉ thêm CAPA sau khi phân tích nguyên nhân")
     if action_type not in ("CORRECTIVE", "PREVENTIVE"):
         raise ValidationFailed("Loại CAPA phải là CORRECTIVE hoặc PREVENTIVE")
@@ -297,6 +379,8 @@ def complete_capa(ctx: Ctx, capa_id, evidence: list[dict]) -> CAPAAction:
     c = _lock(ctx, a.feedback_case_id)
     if not (ctx.actor.has("feedback.manage") or (a.owner_id and str(a.owner_id) == ctx.actor.id)):
         ctx.require("feedback.manage")
+    if c.status != "IN_PROGRESS":
+        raise InvalidTransition("Hồ sơ chưa ở bước thực hiện CAPA (cần 'Giao việc & bắt đầu thực hiện' trước)")
     if a.status not in ("IN_PROGRESS", "APPROVED"):
         raise ValidationFailed("CAPA không ở trạng thái thực hiện")
     ev = _validate_evidence(evidence)
@@ -313,8 +397,12 @@ def submit_for_verification(ctx: Ctx, case_id, note: str = "") -> FeedbackCase:
     ctx.require("feedback.manage")
     c = _lock(ctx, case_id)
     capas = ctx.db.scalars(select(CAPAAction).where(CAPAAction.feedback_case_id == c.id, CAPAAction.status != "CANCELLED")).all()
-    if not capas or any(a.status != "DONE" for a in capas):
-        raise ValidationFailed("Tất cả CAPA phải hoàn thành trước khi kiểm chứng", code="CAPA_NOT_DONE")
+    pending = [a for a in capas if a.status != "DONE"]
+    if not capas or pending:
+        raise ValidationFailed("Tất cả CAPA phải hoàn thành (hoặc huỷ có lý do) trước khi kiểm chứng", code="CAPA_NOT_DONE",
+                               details=[{"id": str(a.id), "description": a.description[:120], "status": a.status} for a in pending])
+    if not any(a.action_type == "CORRECTIVE" for a in capas):
+        raise ValidationFailed("Cần ít nhất 1 hành động khắc phục (CORRECTIVE) đã hoàn thành", code="CAPA_REQUIRED")
     _move(ctx, c, "VERIFY_PENDING", note or "Chờ kiểm chứng hiệu quả")
     return c
 
@@ -330,6 +418,9 @@ def verify(ctx: Ctx, case_id, *, method: str, kpi_after: float | None, passed: b
         raise ValidationFailed("Kết quả kiểm chứng phải có bằng chứng", code="EVIDENCE_REQUIRED")
     if not method.strip():
         raise ValidationFailed("Thiếu phương pháp kiểm chứng")
+    if passed and c.kpi_target is not None and kpi_after is None:
+        raise ValidationFailed(f"Hồ sơ có KPI mục tiêu ({c.kpi_name or 'KPI'} → {c.kpi_target}) — phải nhập KPI sau để kết luận đạt",
+                               code="KPI_REQUIRED")
     if passed and c.kpi_target is not None and kpi_after is not None and c.kpi_before is not None:
         improving_up = c.kpi_target >= c.kpi_before
         if (improving_up and kpi_after < c.kpi_target) or (not improving_up and kpi_after > c.kpi_target):
@@ -358,8 +449,33 @@ def reopen_restart(ctx: Ctx, case_id, target: str, note: str = "") -> FeedbackCa
     if target == "IN_PROGRESS":
         for a in ctx.db.scalars(select(CAPAAction).where(CAPAAction.feedback_case_id == c.id, CAPAAction.status == "DONE")):
             a.status = "IN_PROGRESS"
-    _move(ctx, c, target, note or "Mở lại xử lý")
+    extra = ""
+    if c.deadline and c.deadline < _now() and c.priority in PRIORITY_DAYS:
+        c.deadline = _now() + timedelta(days=PRIORITY_DAYS[c.priority])
+        extra = f" — gia hạn đến {c.deadline:%d/%m/%Y} theo {c.priority}"
+    _move(ctx, c, target, (note or "Mở lại xử lý") + extra)
     return c
+
+
+def cancel_capa(ctx: Ctx, capa_id, reason: str) -> CAPAAction:
+    """Huỷ CAPA không còn phù hợp (vd. đề xuất cũ sau khi phân tích lại) — bắt buộc lý do, giữ lại để truy vết."""
+    ctx.require("feedback.manage")
+    a = ctx.db.get(CAPAAction, capa_id)
+    if a is None:
+        raise NotFound("Không tìm thấy CAPA")
+    c = _lock(ctx, a.feedback_case_id)
+    if c.status in ("VERIFY_PENDING", "VERIFIED", "STANDARDIZED", "CLOSED"):
+        raise InvalidTransition("Không huỷ CAPA khi hồ sơ đã gửi kiểm chứng")
+    if a.status in ("DONE", "CANCELLED"):
+        raise InvalidTransition("CAPA đã hoàn thành hoặc đã huỷ")
+    if len(reason.strip()) < 3:
+        raise ValidationFailed("Cần lý do huỷ CAPA")
+    a.status = "CANCELLED"
+    ctx.db.add(FeedbackEvent(feedback_case_id=c.id, step="CAPA", from_status=c.status, to_status=c.status,
+                             actor_type=ctx.actor.type, actor_ref=ctx.actor.id,
+                             note=f"Huỷ CAPA: {a.description[:200]} — lý do: {reason[:500]}"))
+    audit.record(ctx, "feedback.capa_cancel", "capa_action", a.id, after={"case": c.code, "reason": reason})
+    return a
 
 
 def standardize(ctx: Ctx, case_id, *, note: str, create_lesson: bool = True, lesson: dict | None = None) -> dict:
@@ -408,7 +524,8 @@ def list_cases(ctx: Ctx, *, status=None, priority=None, source=None, project_id=
     if category:
         stmt = stmt.where(FeedbackCase.category == category)
     if q:
-        stmt = stmt.where(or_(FeedbackCase.title.ilike(f"%{q}%"), FeedbackCase.code.ilike(f"%{q}%")))
+        stmt = stmt.where(or_(FeedbackCase.title.ilike(_like(q)), FeedbackCase.code.ilike(_like(q)),
+                              FeedbackCase.description.ilike(_like(q))))
     total = ctx.db.scalar(select(func.count()).select_from(stmt.subquery()))
     items = ctx.db.scalars(stmt.order_by(FeedbackCase.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
     return items, total
@@ -424,8 +541,18 @@ def case_detail(ctx: Ctx, case_id) -> dict:
         "verifications": ctx.db.scalars(select(VerificationResult).where(VerificationResult.feedback_case_id == c.id)
                                         .order_by(VerificationResult.created_at)).all(),
         "events": c.events,
+        "lessons": _case_lessons(ctx, c),
         "overdue": bool(c.deadline and c.deadline < _now() and c.status not in ("CLOSED", "VERIFIED", "STANDARDIZED")),
     }
+
+
+def _case_lessons(ctx: Ctx, c: FeedbackCase) -> list[dict]:
+    """Bài học M09 sinh ra từ hồ sơ — hiện lại sau khi tải lại trang (trước đây chỉ có trong phản hồi chuẩn hoá)."""
+    from app.modules.learning.models import LessonLearned
+
+    rows = ctx.db.scalars(select(LessonLearned).where(LessonLearned.feedback_case_id == c.id)
+                          .order_by(LessonLearned.created_at.desc())).all()
+    return [{"id": str(x.id), "code": x.code, "title": x.title, "status": x.status} for x in rows]
 
 
 def stats(ctx: Ctx) -> dict:

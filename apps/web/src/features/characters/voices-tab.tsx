@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock as LockIcon, Plus, Save } from "lucide-react";
+import { Lock as LockIcon, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, assetUrl, errorMessage } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
+import { ConfirmButton } from "@/components/app/confirm";
 import { Can } from "@/components/app/require";
 import { EmptyState, QueryView } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
@@ -50,10 +51,11 @@ function VoiceForm({ initial, onSubmit, busy, label }: { initial: F; onSubmit: (
       <div><Label>Provider</Label><NativeSelect value={f.provider_code} data-testid="voice-provider" onChange={(e) => {
         const v = e.target.value;
         setF((x) => ({ ...x, provider_code: v, ...(v === "gemini_tts" ? { provider_voice_id: GEMINI_VOICES.includes(x.provider_voice_id) ? x.provider_voice_id : "Kore", usage_rights: x.usage_rights || "Giọng AI dựng sẵn của Google Gemini TTS — dùng cho video thương mại Ánh Ngân" } : {}) }));
-      }}><option value="manual">Thu âm thủ công</option><option value="gemini_tts">Gemini TTS (giọng AI tiếng Việt)</option></NativeSelect></div>
+      }}><option value="manual">Thu âm thủ công</option><option value="gemini_tts">Gemini TTS (giọng AI tiếng Việt)</option><option value="vieneu_local">Giọng nhân bản từ bản ghi âm (VieNeu, chạy trên máy)</option></NativeSelect></div>
       <div><Label>Provider voice ID</Label>{f.provider_code === "gemini_tts"
         ? <NativeSelect value={f.provider_voice_id} onChange={(e) => set("provider_voice_id", e.target.value)} data-testid="voice-provider-id">{GEMINI_VOICES.map((n) => <option key={n} value={n}>{n}</option>)}</NativeSelect>
         : <Input value={f.provider_voice_id} onChange={(e) => set("provider_voice_id", e.target.value)} />}</div>
+      {f.provider_code === "vieneu_local" && <p className="text-[11px] text-slate-500 md:col-span-2" data-testid="voice-vieneu-hint">App đọc lời thoại mới bằng giọng nhân bản từ “Audio tham chiếu” (bản ghi âm chính chủ, nói rõ, ít tạp âm; app lấy 8 giây đầu có tiếng). Để trống “Provider voice ID” thì dùng mã Voice Profile. Cần consent “Đã đồng ý” của chính chủ.</p>}
       {f.provider_code === "gemini_tts" && <p className="text-[11px] text-slate-500 md:col-span-2">Giọng AI dựng sẵn không phải giọng người thật: chọn Consent “Đã đồng ý” và ghi phạm vi sử dụng. Accent, chất giọng, tốc độ được dùng làm hướng dẫn đọc. Nghe thử từng giọng tại aistudio.google.com.</p>}
       <div>
         <Label>Audio Reference {f.audio_reference_asset_id && "✓"}</Label>
@@ -71,26 +73,58 @@ function VoiceForm({ initial, onSubmit, busy, label }: { initial: F; onSubmit: (
   );
 }
 
-function VoiceDetail({ id }: { id: string }) {
+const PROVIDERS: Record<string, string> = { manual: "Thu âm thủ công", gemini_tts: "Gemini TTS", vieneu_local: "Giọng nhân bản (VieNeu, chạy trên máy)" };
+
+function VoiceSummary({ v }: { v: Voice }) {
+  const rows: [string, string | null | undefined][] = [["Accent", v.accent], ["Giới tính", v.gender], ["Độ tuổi", v.age_range], ["Chất giọng", v.tone],
+    ["Tốc độ", v.speaking_rate], ["Provider", PROVIDERS[v.provider_code] ?? v.provider_code], ["Provider voice ID", v.provider_voice_id],
+    ["Consent", CONSENT[v.consent_status]], ["Phạm vi quyền sử dụng", v.usage_rights]];
+  return (
+    <div className="space-y-3" data-testid="voice-summary">
+      <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-2">
+        {rows.map(([k, val]) => <div key={k} className="flex justify-between gap-2 border-b border-slate-100 py-1"><dt className="text-slate-500">{k}</dt><dd className="text-right">{val || "—"}</dd></div>)}
+      </dl>
+      {v.audio_reference_asset_id && <audio controls className="w-full" src={assetUrl(v.audio_reference_asset_id)} crossOrigin="use-credentials" />}
+    </div>
+  );
+}
+
+function VoiceDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
   const qc = useQueryClient();
   const { has } = useAuth();
   const q = useQuery<{ voice: Voice; locks: Lock[] }>({ queryKey: ["voice", id], queryFn: () => api(`/voices/${id}`) });
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => setEditing(false), [id]);
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true);
-    try { await fn(); toast.success(ok); qc.invalidateQueries({ queryKey: ["voice", id] }); qc.invalidateQueries({ queryKey: ["voices"] }); }
-    catch (e) { toast.error(errorMessage(e)); } finally { setBusy(false); }
+    try { await fn(); toast.success(ok); qc.invalidateQueries({ queryKey: ["voice", id] }); qc.invalidateQueries({ queryKey: ["voices"] }); return true; }
+    catch (e) { toast.error(errorMessage(e)); return false; } finally { setBusy(false); }
+  };
+  const remove = async () => {
+    try { await api(`/voices/${id}`, { method: "DELETE" }); toast.success("Đã xoá giọng nói"); qc.invalidateQueries({ queryKey: ["voices"] }); onDeleted(); }
+    catch (e) { toast.error(errorMessage(e)); }
   };
   return (
     <QueryView q={q}>
       {({ voice: v, locks }) => (
         <div className="space-y-4" data-testid="voice-detail">
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><span className="font-mono text-sm text-slate-500">{v.code}</span>{v.name}<Badge variant={v.status === "LOCKED" ? "green" : "gray"}>{v.status === "LOCKED" ? "Đã khoá" : "Nháp"}</Badge></CardTitle>
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <CardTitle className="flex items-center gap-2"><span className="font-mono text-sm text-slate-500">{v.code}</span>{v.name}<Badge variant={v.status === "LOCKED" ? "green" : "gray"}>{v.status === "LOCKED" ? "Đã khoá" : "Nháp"}</Badge></CardTitle>
+                <Can perm="character.edit"><div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setEditing((x) => !x)} data-testid="voice-edit">{editing ? <><X />Huỷ sửa</> : <><Pencil />Sửa</>}</Button>
+                  <ConfirmButton size="sm" variant="destructive" title={`Xoá giọng ${v.code}?`} requireText={v.code} confirmLabel="Xoá giọng"
+                    description="Giọng sẽ bị ẩn khỏi danh sách; Voice Lock và bản ghi âm vẫn được lưu làm lịch sử. Không xoá được khi nhân vật hoặc dự án đang làm còn dùng giọng này."
+                    onConfirm={remove} data-testid="voice-delete"><Trash2 />Xoá</ConfirmButton>
+                </div></Can>
+              </div>
               <CardDescription>Voice Lock yêu cầu consent ĐÃ ĐỒNG Ý và có audio tham chiếu.</CardDescription></CardHeader>
             <CardContent>
-              {has("character.edit") ? <VoiceForm initial={Object.fromEntries(Object.keys(empty).map((k) => [k, String((v as unknown as Record<string, unknown>)[k] ?? "")])) as F} busy={busy} label="Lưu giọng"
-                onSubmit={(f) => run(() => api(`/voices/${v.id}`, { method: "PATCH", body: toBody(f) }), "Đã lưu giọng nói")} /> : <p className="text-sm">{v.accent} · {v.tone}</p>}
+              {editing && has("character.edit") ? <VoiceForm initial={Object.fromEntries(Object.keys(empty).map((k) => [k, String((v as unknown as Record<string, unknown>)[k] ?? "")])) as F} busy={busy} label="Lưu giọng"
+                onSubmit={async (f) => { if (await run(() => api(`/voices/${v.id}`, { method: "PATCH", body: toBody(f) }), "Đã lưu giọng nói")) setEditing(false); }} />
+                : <VoiceSummary v={v} />}
             </CardContent>
           </Card>
           <Card>
@@ -131,7 +165,7 @@ export function VoicesTab() {
         </QueryView>
       </CardContent></Card>
       <div>{creating ? <Card><CardHeader><CardTitle>Giọng nói mới</CardTitle></CardHeader><CardContent><VoiceForm initial={empty} busy={busy} label="Tạo giọng nói" onSubmit={create} /></CardContent></Card>
-        : sel ? <VoiceDetail id={sel} /> : <EmptyState title="Chọn giọng nói" />}</div>
+        : sel ? <VoiceDetail id={sel} onDeleted={() => setSel(null)} /> : <EmptyState title="Chọn giọng nói" />}</div>
     </div>
   );
 }
