@@ -20,6 +20,7 @@ class Publication(UUIDMixin, TimestampMixin, DataModeMixin, Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     post_url: Mapped[str | None] = mapped_column(String(500))
     external_id: Mapped[str | None] = mapped_column(String(100))  # mã video/bài trên nền tảng (vd. Facebook Reel id)
+    target_ref: Mapped[str | None] = mapped_column(String(64))  # Fanpage đích (page_id) khi kênh gắn nhiều Fanpage
     publish_mode: Mapped[str] = mapped_column(String(10), default="MANUAL")  # MANUAL | API
     # DRAFT | SCHEDULED | PUBLISH_QUEUED | EXPORTED | PENDING_REVIEW (nháp trên nền tảng chờ duyệt) | PUBLISHED | FAILED | CANCELLED
     status: Mapped[str] = mapped_column(String(20), default="DRAFT", index=True)

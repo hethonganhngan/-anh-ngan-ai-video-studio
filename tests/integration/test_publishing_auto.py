@@ -7,6 +7,7 @@ import pytest
 from tests.integration.test_publishing_analytics import _approved
 
 PAGE = "1234567890"
+PAGE2 = "9876543210"
 
 
 class FakeGraph:
@@ -22,6 +23,8 @@ class FakeGraph:
             return httpx.Response(200, json={"data": [{"id": PAGE, "name": "Sữa Ánh Ngân", "tasks": ["CREATE_CONTENT"]}]})
         if path.endswith(f"/{PAGE}") and req.method == "GET":
             return httpx.Response(200, json={"id": PAGE, "name": "Sữa Ánh Ngân", "access_token": "PAGE-TOKEN"})
+        if path.endswith(f"/{PAGE2}") and req.method == "GET":
+            return httpx.Response(200, json={"id": PAGE2, "name": "Ánh Ngân Bình Mỹ", "access_token": "PAGE2-TOKEN"})
         if path.endswith(f"/{PAGE}/video_reels"):
             body = json.loads(req.content) if req.headers.get("content-type") == "application/json" else {}
             if body.get("upload_phase") == "start":
@@ -125,4 +128,23 @@ def test_channel_connects_facebook_and_sends_draft_only(login, channels, graph):
     finally:
         db.close()
     admin.put(f"/channels/{channels['KTMB']['id']}/facebook", json={"page_id": None})
+    admin.patch(f"/admin/providers/{fb['id']}", json={"clear_api_key": True})
+
+
+def test_channel_multiple_fanpages(login, channels, graph):
+    """Một kênh gắn nhiều Fanpage: thêm/gỡ từng trang, không gắn trùng, trang đầu là Fanpage mặc định."""
+    admin = login("admin")
+    fb = next(x for x in admin.get("/admin/providers").json() if x["provider_code"] == "facebook_pages")
+    admin.patch(f"/admin/providers/{fb['id']}", json={"api_key": "USER-TOKEN-xyz", "is_enabled": True})
+    cid = channels["CNM"]["id"]
+    ch = admin.post(f"/channels/{cid}/facebook/pages", json={"page_id": PAGE}).json()
+    ch = admin.post(f"/channels/{cid}/facebook/pages", json={"page_id": PAGE2}).json()
+    assert [x["page_id"] for x in ch["publish_targets"]["FACEBOOK_PAGES"]] == [PAGE, PAGE2]
+    assert ch["publish_targets"]["FACEBOOK"]["page_id"] == PAGE
+    assert admin.post(f"/channels/{cid}/facebook/pages", json={"page_id": PAGE2}).status_code == 409
+    ch = admin.delete(f"/channels/{cid}/facebook/pages/{PAGE}").json()
+    assert [x["page_id"] for x in ch["publish_targets"]["FACEBOOK_PAGES"]] == [PAGE2]
+    assert ch["publish_targets"]["FACEBOOK"]["page_id"] == PAGE2
+    assert admin.delete(f"/channels/{cid}/facebook/pages/{PAGE}").status_code == 404
+    admin.put(f"/channels/{cid}/facebook", json={"page_id": None})
     admin.patch(f"/admin/providers/{fb['id']}", json={"clear_api_key": True})

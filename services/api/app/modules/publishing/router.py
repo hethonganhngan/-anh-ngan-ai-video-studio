@@ -40,6 +40,7 @@ class PubOut(ORM):
     published_at: datetime | None
     post_url: str | None
     external_id: str | None
+    target_ref: str | None = None
     publish_mode: str
     status: str
     export_asset_id: uuid.UUID | None

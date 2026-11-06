@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
@@ -30,11 +31,35 @@ type Dash = {
   simulated_cost: number;
 };
 
+/** Nhóm trạng thái khớp services/api/app/modules/analytics/service.py (IN_PRODUCTION, COMPLETED…). */
+const IN_PRODUCTION = "SCRIPT_GENERATING,SCRIPT_REVIEW,STORYBOARD_READY,ASSET_VALIDATION,GENERATION_QUEUED,GENERATING,SCENE_QC,RENDERING,FINAL_QC,RETRY_PENDING,NEEDS_MANUAL_ACTION";
+const COMPLETED = "APPROVED,PUBLISH_QUEUED,PUBLISHED,ANALYTICS_COLLECTION,FEEDBACK_REVIEW";
+const projectsBy = (status: string, label: string) => `/projects?${new URLSearchParams({ status, label })}`;
+
+/** Mỗi KPI dẫn tới màn hình xử lý việc đó. */
+const KPI_LINKS: Record<string, { href: string; action: string }> = {
+  videos_total: { href: "/projects", action: "Xem danh sách dự án" },
+  in_production: { href: projectsBy(IN_PRODUCTION, "Đang sản xuất"), action: "Xem dự án đang sản xuất" },
+  pending_approval: { href: projectsBy("APPROVAL_PENDING,SCRIPT_REVIEW", "Chờ duyệt"), action: "Duyệt ngay" },
+  completed: { href: projectsBy(COMPLETED, "Hoàn thành (đã duyệt)"), action: "Xem video đã duyệt" },
+  published: { href: "/publishing", action: "Mở Publishing" },
+  cost_total: { href: "/settings?tab=budget", action: "Xem ngân sách & chi phí" },
+  cost_per_approved: { href: "/settings?tab=budget", action: "Xem ngân sách & chi phí" },
+  avg_qc: { href: "/quality", action: "Mở Quality Control" },
+  qc_pass_rate: { href: "/quality", action: "Mở Quality Control" },
+  regen_rate: { href: "/projects?tab=queue", action: "Xem hàng đợi tạo cảnh" },
+  feedback_cases: { href: "/feedback", action: "Mở Feedback Loop" },
+  capa_verified_rate: { href: "/feedback", action: "Mở Feedback Loop" },
+  views_total: { href: "/publishing", action: "Xem analytics" },
+  engagement_avg: { href: "/publishing", action: "Xem analytics" },
+};
+
 /** Ngày theo giờ Việt Nam (doanh nghiệp vận hành theo Asia/Ho_Chi_Minh, không phụ thuộc múi giờ trình duyệt). */
 const iso = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 
 export default function DashboardPage() {
   const { me } = useAuth();
+  const router = useRouter();
   const channels = useChannels();
   const users = useUsers();
   const projects = useQuery<Page<Project>>({ queryKey: ["projects", "dash-filter"], queryFn: () => api("/projects?page_size=200") });
@@ -91,14 +116,14 @@ export default function DashboardPage() {
                   {d.budget_alerts.map((a, i) => (
                     <div key={i} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                       <span><Badge variant={a.level === "CRITICAL" ? "red" : "yellow"}>{a.level === "CRITICAL" ? "Vượt" : "Sắp chạm"}</Badge> {a.scope} {a.ref !== "*" ? a.ref : ""} ({a.period})</span>
-                      <span>{formatVND(a.used)} / {formatVND(a.limit)} · <b>{a.pct}%</b></span>
+                      <span>{formatVND(a.used)} / {formatVND(a.limit)} · <b>{a.pct}%</b> · <Link className="text-brand-600 hover:underline" href="/settings?tab=budget">Xử lý</Link></span>
                     </div>
                   ))}
                 </CardContent>
               </Card>
             )}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5" data-testid="kpi-grid">
-              {d.kpis.map((k) => <KpiCard key={k.key} kpi={k} />)}
+              {d.kpis.map((k) => <KpiCard key={k.key} kpi={k} href={KPI_LINKS[k.key]?.href} action={KPI_LINKS[k.key]?.action} />)}
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
@@ -137,12 +162,13 @@ export default function DashboardPage() {
                 <CardContent className="h-64" data-testid="chart-status">
                   {Object.keys(d.by_status).length === 0 ? <EmptyState title="Chưa có dự án" /> : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={Object.entries(d.by_status).map(([k, v]) => ({ name: PROJECT_STATUS[k]?.label ?? k, value: v }))} layout="vertical" margin={{ left: 40 }}>
+                      <BarChart data={Object.entries(d.by_status).map(([k, v]) => ({ key: k, name: PROJECT_STATUS[k]?.label ?? k, value: v }))} layout="vertical" margin={{ left: 40 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                         <XAxis type="number" allowDecimals={false} fontSize={11} />
                         <YAxis type="category" dataKey="name" width={130} fontSize={11} />
                         <Tooltip />
-                        <Bar dataKey="value" name="Số dự án" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="value" name="Số dự án" fill="#3b82f6" radius={[0, 4, 4, 0]} className="cursor-pointer"
+                          onClick={(e) => { const p = e.payload as { key: string; name: string }; router.push(projectsBy(p.key, p.name)); }} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -172,7 +198,11 @@ export default function DashboardPage() {
             </div>
             <p className="text-xs text-slate-400">Kỳ: {d.period.from.slice(0, 10)} → {d.period.to.slice(0, 10)} · Chế độ {d.mode} · Người xem: {me?.full_name}</p>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(d.by_status).map(([k, v]) => <span key={k} className="flex items-center gap-1 text-xs"><StatusBadge map={PROJECT_STATUS} value={k} />{v}</span>)}
+              {Object.entries(d.by_status).map(([k, v]) => (
+                <Link key={k} href={projectsBy(k, PROJECT_STATUS[k]?.label ?? k)} className="flex items-center gap-1 rounded text-xs hover:ring-2 hover:ring-brand-500" data-testid="status-chip">
+                  <StatusBadge map={PROJECT_STATUS} value={k} />{v}
+                </Link>
+              ))}
             </div>
             <Button variant="outline" asChild><Link href="/projects">Xem danh sách dự án</Link></Button>
           </div>

@@ -59,7 +59,7 @@ def check_caption(ctx: Ctx, channel_id, caption: str, hashtags: list[str]) -> li
 
 
 def create_publication(ctx: Ctx, project_id, *, platform: str, caption: str, hashtags: list[str], scheduled_at=None,
-                       publish_mode: str = "MANUAL") -> Publication:
+                       publish_mode: str = "MANUAL", target_ref: str | None = None) -> Publication:
     ctx.require("publish.manage")
     p = get_project(ctx, project_id)
     if p.status not in PUBLISHABLE:
@@ -81,7 +81,7 @@ def create_publication(ctx: Ctx, project_id, *, platform: str, caption: str, has
     if scheduled_at and scheduled_at.tzinfo is None:
         scheduled_at = scheduled_at.replace(tzinfo=timezone.utc)
     pub = Publication(project_id=p.id, render_id=render.id, channel_id=p.channel_id, platform=platform, caption=caption,
-                      hashtags=tags, scheduled_at=scheduled_at, publish_mode=publish_mode,
+                      hashtags=tags, scheduled_at=scheduled_at, publish_mode=publish_mode, target_ref=target_ref,
                       status="SCHEDULED" if scheduled_at else "DRAFT", created_by=ctx.actor.user_uuid, data_mode=ctx.mode)
     ctx.db.add(pub)
     ctx.db.flush()
@@ -302,7 +302,7 @@ def draft_caption(ctx: Ctx, p: Project) -> tuple[str, list[str]]:
 
 def auto_prepare(ctx: Ctx, project_id) -> list[Publication]:
     """M10 tự động sau khi video được NGƯỜI phê duyệt: mỗi nền tảng của kênh → caption + hashtag + lịch đăng + gói xuất file;
-    Facebook đã gắn Fanpage (M13) và đã kết nối → tải lên BẢN NHÁP chờ duyệt. Idempotent: nền tảng đã có bài thì bỏ qua."""
+    Facebook đã gắn Fanpage (M13) và đã kết nối → tải lên BẢN NHÁP chờ duyệt. Mỗi Fanpage gắn với kênh nhận một bài riêng. Idempotent: nền tảng/Fanpage đã có bài thì bỏ qua."""
     from app.modules.administration.service import get_setting, notify
 
     ctx.require("publish.manage")
@@ -310,16 +310,25 @@ def auto_prepare(ctx: Ctx, project_id) -> list[Publication]:
     if p.status not in ("APPROVED", "PUBLISH_QUEUED"):
         return []
     ch = ctx.db.get(Channel, p.channel_id)
-    existing = set(ctx.db.scalars(select(Publication.platform).where(Publication.project_id == p.id,
-                                                                     Publication.status != "CANCELLED")))
+    default_page = fb_page_id(ctx, ch)
+    # Bài cũ chưa ghi Fanpage (trước khi có nhiều Fanpage) được tính là của Fanpage mặc định.
+    existing = {(x.platform, x.target_ref or (default_page if x.platform == "FACEBOOK" else None))
+                for x in ctx.db.scalars(select(Publication).where(Publication.project_id == p.id,
+                                                                  Publication.status != "CANCELLED"))}
     rules = ch.brand_profile.publishing_rules if ch and ch.brand_profile else []
     caption, tags = draft_caption(ctx, p)
     created, problems = [], []
-    for platform in [x for x in (ch.platforms or ["FACEBOOK"]) if x in PLATFORMS and x not in existing]:
+    targets = []
+    for platform in [x for x in (ch.platforms or ["FACEBOOK"]) if x in PLATFORMS]:
+        if platform == "FACEBOOK":  # mỗi Fanpage đã gắn một bài riêng
+            targets += [(platform, page) for page in ([str(x["page_id"]) for x in fb_pages(ch)] or [default_page])]
+        else:
+            targets.append((platform, None))
+    for platform, page in [t for t in targets if t not in existing]:
         try:
             pub = create_publication(ctx, p.id, platform=platform, caption=caption, hashtags=tags,
                                      scheduled_at=next_slot(ctx, p.channel_id, platform, rules),
-                                     publish_mode="API" if platform == "FACEBOOK" and fb_page_id(ctx, ch) else "MANUAL")
+                                     publish_mode="API" if page else "MANUAL", target_ref=page)
             export_package(ctx, pub.id)
             created.append(pub)
         except ValidationFailed as e:
@@ -345,10 +354,19 @@ def auto_prepare(ctx: Ctx, project_id) -> list[Publication]:
 
 
 # ---------- Facebook: bản nháp chờ duyệt ----------
+def fb_pages(ch: Channel | None) -> list[dict]:
+    """Các Fanpage gắn với kênh. Dữ liệu cũ chỉ có một trang ở publish_targets.FACEBOOK."""
+    targets = (ch.publish_targets if ch else None) or {}
+    if "FACEBOOK_PAGES" in targets:
+        return list(targets["FACEBOOK_PAGES"] or [])
+    return [targets["FACEBOOK"]] if (targets.get("FACEBOOK") or {}).get("page_id") else []
+
+
 def fb_page_id(ctx: Ctx, ch: Channel | None) -> str | None:
-    target = ((ch.publish_targets if ch else None) or {}).get("FACEBOOK") or {}
-    if target.get("page_id"):
-        return str(target["page_id"])
+    """Fanpage mặc định của kênh (trang gắn đầu tiên), không có thì trang cấu hình ở M15."""
+    pages = fb_pages(ch)
+    if pages:
+        return str(pages[0]["page_id"])
     acc = ctx.db.scalar(select(ProviderAccount).where(ProviderAccount.provider_code == "facebook_pages"))
     pid = (acc.config or {}).get("page_id") if acc else None
     return str(pid) if pid else None
@@ -392,9 +410,12 @@ def send_facebook_draft(ctx: Ctx, pid) -> Publication:
     if pub.status not in FB_READY:
         raise InvalidTransition(f"Bài ở trạng thái {pub.status} — không gửi lại bản nháp")
     ch = ctx.db.get(Channel, pub.channel_id)
-    page_id = fb_page_id(ctx, ch)
+    page_id = pub.target_ref or fb_page_id(ctx, ch)
     if not page_id:
         raise ValidationFailed(f"Kênh {ch.name} chưa gắn Fanpage (M13 → Kênh → Kết nối Facebook)", code="FB_PAGE_REQUIRED")
+    if pub.target_ref and pub.target_ref not in {str(x["page_id"]) for x in fb_pages(ch)}:
+        raise ValidationFailed(f"Fanpage {pub.target_ref} đã bị gỡ khỏi kênh {ch.name} — huỷ bài này hoặc gắn lại Fanpage",
+                               code="FB_PAGE_REMOVED")
     publisher = facebook_publisher(ctx)
     render = ctx.db.get(Render, pub.render_id)
     a = ctx.db.get(Asset, render.video_asset_id) if render and render.video_asset_id else None
@@ -423,7 +444,7 @@ def sync_facebook(ctx: Ctx, pid) -> Publication:
     if pub.status != "PENDING_REVIEW" or not pub.external_id:
         return pub
     ch = ctx.db.get(Channel, pub.channel_id)
-    info = fb_call(facebook_publisher(ctx, require_verified=False).status, fb_page_id(ctx, ch), pub.external_id)
+    info = fb_call(facebook_publisher(ctx, require_verified=False).status, pub.target_ref or fb_page_id(ctx, ch), pub.external_id)
     if info["publish_status"] == "published":
         pub.status, pub.post_url, pub.published_at = "PUBLISHED", info["permalink_url"][:500], _now()
         pub.error_message = None

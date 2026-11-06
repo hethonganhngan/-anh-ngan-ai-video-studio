@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, RefreshCw, RotateCcw, XCircle } from "lucide-react";
@@ -24,8 +25,12 @@ type Kanban = { columns: { name: string; statuses: string[]; items: Project[] }[
 type RenderJob = { id: string; project_id: string; status: string; attempt_no: number; max_retries: number; error_message: string | null; created_at: string; finished_at: string | null };
 
 function ProjectsTable() {
+  const sp = useSearchParams();
+  // Dashboard CEO có thể gửi một nhóm trạng thái ("A,B,C") kèm nhãn để lọc sẵn.
+  const initStatus = sp.get("status") ?? "";
+  const groupLabel = initStatus && !PROJECT_STATUS[initStatus] ? sp.get("label") ?? "Nhóm trạng thái từ Dashboard" : "";
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(initStatus);
   const [channel, setChannel] = useState("");
   const [owner, setOwner] = useState("");
   const channels = useChannels();
@@ -44,6 +49,7 @@ function ProjectsTable() {
           <Input placeholder="Tìm mã, tiêu đề, chủ đề…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="filter-q" />
           <NativeSelect value={status} onChange={(e) => setStatus(e.target.value)} data-testid="filter-status">
             <option value="">Mọi trạng thái</option>
+            {groupLabel && <option value={initStatus}>{groupLabel}</option>}
             {Object.entries(PROJECT_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </NativeSelect>
           <NativeSelect value={channel} onChange={(e) => setChannel(e.target.value)} data-testid="filter-channel">
@@ -222,12 +228,16 @@ function Batches() {
   );
 }
 
+const TABS = ["list", "kanban", "queue", "batches"];
+
 export default function ProjectsPage() {
+  const sp = useSearchParams();
+  const tab = sp.get("tab");
   return (
     <RequirePermission perm="project.view">
       <PageHeader code="M11" title="Quản lý dự án & hàng đợi" description="Theo dõi tiến độ, Kanban, hàng đợi tác vụ, lô sản xuất và nhật ký thực thi."
         actions={<Can perm="project.create"><Button asChild data-testid="new-project"><Link href="/create"><Plus />Tạo video</Link></Button></Can>} />
-      <Tabs defaultValue="list">
+      <Tabs key={tab ?? "list"} defaultValue={tab && TABS.includes(tab) ? tab : "list"}>
         <TabsList>
           <TabsTrigger value="list">Danh sách</TabsTrigger>
           <TabsTrigger value="kanban" data-testid="tab-kanban">Kanban</TabsTrigger>
