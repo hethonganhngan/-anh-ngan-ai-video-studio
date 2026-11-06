@@ -34,6 +34,8 @@ Start-Svc "beat" "$Py\celery.exe" @("-A", "app.celery_app", "beat", "-l", "info"
 
 # Giọng nhân bản VieNeu (nếu đã cài bằng start-vieneu.ps1)
 if (Test-Path "$Data\vieneu\.venv\Scripts\python.exe") { & "$PSScriptRoot\start-vieneu.ps1" }
+# Chrome Flow (provider flow_cdp): profile đã đăng nhập Flow thì mở luôn — tránh lỗi ECONNREFUSED 9222 khi tạo cảnh
+if (Test-Path "$Data\chrome-flow") { & "$PSScriptRoot\start-flow-chrome.ps1" }
 
 # 5. Web (bản build production; build nếu chưa có)
 $web = "$Root\apps\web"

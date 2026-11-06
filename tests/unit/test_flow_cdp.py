@@ -261,3 +261,31 @@ def test_flow_never_starts_needs_manual_without_opening_old_items(fake_chrome):
     fake_chrome.update(start_at=10**6, ready_at=10**6)  # tác nhân không tạo gì (vd. hỏi lại)
     job_id = FlowCDPProvider("flow_cdp", "Flow", {})._generate(GenerationSpec(job_ref="j", prompt_text=PROMPT))
     assert job_id.startswith(F.MANUAL) and "chưa bắt đầu tạo" in job_id and "opened" not in fake_chrome
+
+
+def test_connect_auto_launches_chrome_once_when_cdp_down(monkeypatch):
+    """Chrome Flow chưa mở → tự chạy start-flow-chrome.ps1 rồi kết nối lại (lỗi ECONNREFUSED 9222 sau khi khởi động máy)."""
+    import types
+
+    from app.providers.video.flow_cdp import FlowCDPProvider
+
+    browser = types.SimpleNamespace(contexts=["ctx"])
+    calls = {"connect": 0, "launch": 0}
+
+    def connect(url, timeout):
+        calls["connect"] += 1
+        if calls["launch"] == 0:
+            raise RuntimeError("connect ECONNREFUSED 127.0.0.1:9222")
+        return browser
+
+    p = FlowCDPProvider("flow_cdp", "Flow", {})
+    monkeypatch.setattr(p, "_launch_chrome", lambda: calls.__setitem__("launch", 1) or True)
+    pw = types.SimpleNamespace(chromium=types.SimpleNamespace(connect_over_cdp=connect))
+    assert p._connect(pw) == (browser, "ctx") and calls == {"connect": 2, "launch": 1}
+
+    # Không mở được Chrome → báo lỗi rõ ràng, không lặp vô hạn
+    calls.update(connect=0, launch=0)
+    monkeypatch.setattr(p, "_launch_chrome", lambda: False)
+    with pytest.raises(Exception, match="start-flow-chrome"):
+        p._connect(pw)
+    assert calls["connect"] == 1

@@ -113,11 +113,52 @@ class FlowCDPProvider(VideoProvider):
         try:
             browser = pw.chromium.connect_over_cdp(self.cdp_url, timeout=15000)
         except Exception as e:  # noqa: BLE001
-            raise ProviderError(f"Không kết nối được Chrome Flow ({self.cdp_url}). Chạy scripts/windows/start-flow-chrome.ps1 "
-                                f"rồi tạo lại cảnh. Chi tiết: {str(e)[:200]}", code="PROVIDER_UNAVAILABLE", retryable=False)
+            # Chrome Flow chưa mở (máy khởi động lại / lỡ đóng cửa sổ) → tự mở profile Flow rồi thử lại 1 lần
+            if not self._launch_chrome():
+                raise ProviderError(f"Không kết nối được Chrome Flow ({self.cdp_url}). Chạy scripts/windows/start-flow-chrome.ps1 "
+                                    f"rồi tạo lại cảnh. Chi tiết: {str(e)[:200]}", code="PROVIDER_UNAVAILABLE", retryable=False)
+            try:
+                browser = pw.chromium.connect_over_cdp(self.cdp_url, timeout=15000)
+            except Exception as e2:  # noqa: BLE001
+                raise ProviderError(f"Đã tự mở Chrome Flow nhưng vẫn không kết nối được ({self.cdp_url}). Chi tiết: {str(e2)[:200]}",
+                                    code="PROVIDER_UNAVAILABLE", retryable=False)
         if not browser.contexts:
             raise ProviderError("Chrome Flow không có profile đang mở", code="PROVIDER_UNAVAILABLE", retryable=False)
         return browser, browser.contexts[0]
+
+    def _cdp_alive(self) -> bool:
+        import urllib.request
+
+        try:
+            with urllib.request.urlopen(f"{self.cdp_url}/json/version", timeout=2) as r:
+                return r.status == 200
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _launch_chrome(self, wait_sec: int = 40) -> bool:
+        """Chạy scripts/windows/start-flow-chrome.ps1 (profile Flow riêng, CDP chỉ 127.0.0.1) và chờ cổng CDP mở.
+        Chỉ trên Windows và khi config auto_launch (mặc định bật); không đăng nhập hộ — phiên đăng nhập nằm sẵn trong profile."""
+        import subprocess
+        from pathlib import Path
+
+        if os.name != "nt" or not self.config.get("auto_launch", True):
+            return False
+        script = next((p / "scripts" / "windows" / "start-flow-chrome.ps1" for p in Path(__file__).resolve().parents
+                       if (p / "scripts" / "windows" / "start-flow-chrome.ps1").exists()), None)
+        if script is None:
+            return False
+        try:
+            subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+                           capture_output=True, timeout=60, check=False)
+        except Exception:  # noqa: BLE001
+            return False
+        end = time.time() + wait_sec
+        while time.time() < end:
+            if self._cdp_alive():
+                time.sleep(3)  # chờ Chrome mở xong tab đầu
+                return True
+            time.sleep(1)
+        return False
 
     def _open_project(self, ctx):
         page = ctx.new_page()
